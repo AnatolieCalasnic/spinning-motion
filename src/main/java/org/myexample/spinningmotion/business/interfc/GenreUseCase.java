@@ -1,0 +1,10 @@
+package org.myexample.spinningmotion.business.interfc;
+
+import org.myexample.spinningmotion.domain.genre.*;
+
+import java.util.List;
+
+public interface GenreUseCase {
+    GetGenreResponse getGenre(GetGenreRequest request);
+    GetAllGenresResponse getAllGenres(GetAllGenresRequest request);
+}
