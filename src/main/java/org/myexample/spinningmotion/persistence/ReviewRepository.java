@@ -9,4 +9,6 @@ public interface ReviewRepository {
     Optional<ReviewEntity> findById(Long id);
     List<ReviewEntity> findAllByRecordId(Long recordId);
     void deleteById(Long id);
+    Optional<ReviewEntity> findByUserIdAndRecordId(Long userId, Long recordId);
+
 }

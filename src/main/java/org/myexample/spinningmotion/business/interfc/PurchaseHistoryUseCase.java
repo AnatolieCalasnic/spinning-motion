@@ -8,4 +8,5 @@ public interface PurchaseHistoryUseCase {
     GetPurchaseHistoryResponse getPurchaseHistory(GetPurchaseHistoryRequest request);
     List<GetPurchaseHistoryResponse> getAllPurchaseHistories(Long userId);
     void deletePurchaseHistory(Long id);
+
 }

@@ -18,4 +18,5 @@ public class CreateRecordResponse {
     private Double price;
     private Integer year;
     private String condition;
+    private Integer quantity;
 }
