@@ -40,4 +40,13 @@ public class FakeReviewRepository implements ReviewRepository {
     public void deleteById(Long id) {
         reviews.remove(id);
     }
+    @Override
+    public Optional<ReviewEntity> findByUserIdAndRecordId(Long userId, Long recordId) {
+        return reviews.values().stream()
+                .filter(r -> r.getUserId().equals(userId) && r.getRecordId().equals(recordId))
+                .findFirst();
+
+    }
+    //filters the reviews map for a ReviewEntity that matches both the userId and recordId and returns an Optional of the result
+
 }

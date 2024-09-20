@@ -9,4 +9,5 @@ public interface PurchaseHistoryRepository {
     Optional<PurchaseHistoryEntity> findById(Long id);
     List<PurchaseHistoryEntity> findAllByUserId(Long userId);
     void deleteById(Long id);
+
 }

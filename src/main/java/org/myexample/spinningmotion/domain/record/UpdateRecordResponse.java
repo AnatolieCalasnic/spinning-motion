@@ -18,4 +18,5 @@ public class UpdateRecordResponse {
     private Double price;
     private Integer year;
     private String condition;
+    private Integer quantity;
 }
