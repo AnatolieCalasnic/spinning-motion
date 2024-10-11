@@ -39,4 +39,8 @@ public class FakeGenreRepository implements GenreRepository {
     public boolean existsByName(String name) {
         return genres.values().stream().anyMatch(g -> g.getName().equals(name));
     }
+    @Override
+    public boolean existsAny() {
+        return !genres.isEmpty();
+    }
 }

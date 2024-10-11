@@ -73,25 +73,6 @@ class GenreControllerTest {
         verify(genreUseCase, times(1)).getGenre(any(GetGenreRequest.class));
     }
 
-    @Test
-    void createGenre_Success() throws Exception {
-        doNothing().when(genreUseCase).createGenre(any(GenreEnum.class));
-
-        mockMvc.perform(post("/genres/ROCK"))
-                .andExpect(status().isCreated())
-                .andExpect(content().string("Genre created: Rock"));
-
-        verify(genreUseCase, times(1)).createGenre(GenreEnum.ROCK);
-    }
-
-    @Test
-    void createGenre_InvalidGenre() throws Exception {
-        mockMvc.perform(post("/genres/INVALID_GENRE"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Invalid genre name: INVALID_GENRE"));
-
-        verify(genreUseCase, never()).createGenre(any(GenreEnum.class));
-    }
 
     @Test
     void getAllGenres_Success() throws Exception {

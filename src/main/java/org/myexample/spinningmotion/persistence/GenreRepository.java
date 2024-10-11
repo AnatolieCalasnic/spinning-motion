@@ -11,4 +11,5 @@ public interface GenreRepository {
     List<GenreEntity> findAll();
     void deleteById(Long id);
     boolean existsByName(String name);
+    boolean existsAny();
 }

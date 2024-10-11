@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/genres")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:3000")
 public class GenreController {
 
     private final GenreUseCase genreUseCase;
@@ -21,17 +22,17 @@ public class GenreController {
         GetGenreResponse response = genreUseCase.getGenre(new GetGenreRequest(id));
         return ResponseEntity.ok(response);
     }
-    @PostMapping("/{genreName}")
-    public ResponseEntity<String> createGenre(@PathVariable String genreName) {
-        try {
-            GenreEnum genreEnum = GenreEnum.valueOf(genreName.toUpperCase());
-            genreUseCase.createGenre(genreEnum);
-            return ResponseEntity.status(201).body("Genre created: " + genreEnum.getDisplayName());
-        }
-        catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid genre name: " + genreName);
-        }
-    }
+//    @PostMapping("/{genreName}")
+//    public ResponseEntity<String> createGenre(@PathVariable String genreName) {
+//        try {
+//           GenreEnum genreEnum = GenreEnum.valueOf(genreName.toUpperCase());
+//          genreUseCase.createGenre(genreEnum);
+//          return ResponseEntity.status(201).body("Genre created: " + genreEnum.getDisplayName());
+//       }
+//       catch (IllegalArgumentException e) {
+//           return ResponseEntity.badRequest().body("Invalid genre name: " + genreName);
+//       }
+//   }
     @GetMapping
     public ResponseEntity<GetAllGenresResponse> getAllGenres() {
         GetAllGenresResponse response = genreUseCase.getAllGenres(new GetAllGenresRequest());
