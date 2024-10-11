@@ -1,6 +1,7 @@
 stages: 
     - build 
-    - test 
+    - test
+    - docker
 build: 
     stage: build 
     script: 
