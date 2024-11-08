@@ -2,6 +2,7 @@ package org.myexample.spinningmotion.business.impl;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.myexample.spinningmotion.persistence.entity.BasketEntity;
 import org.mockito.Mock;
 import org.mockito.InjectMocks;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,12 +11,10 @@ import org.myexample.spinningmotion.business.exception.*;
 import org.myexample.spinningmotion.domain.basket.*;
 import org.myexample.spinningmotion.persistence.BasketRepository;
 import org.myexample.spinningmotion.persistence.RecordRepository;
-import org.myexample.spinningmotion.persistence.entity.BasketEntity;
 import org.myexample.spinningmotion.persistence.entity.BasketItemEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -120,7 +119,12 @@ class BasketUseCaseImplTest {
     @Test
     void updateBasketItemQuantity_Success() {
         UpdateBasketItemQuantityRequest request = new UpdateBasketItemQuantityRequest(1L, 1L, 5);
-        basketEntity.getItems().add(new BasketItemEntity(1L, 2));
+        BasketItemEntity basketItem = BasketItemEntity.builder()
+                .recordId(1L)
+                .quantity(2)
+                .build();
+        basketEntity.getItems().add(basketItem);
+
         when(basketRepository.findByUserId(1L)).thenReturn(Optional.of(basketEntity));
         when(recordRepository.findById(1L)).thenReturn(Optional.of(recordEntity));
 
@@ -144,7 +148,10 @@ class BasketUseCaseImplTest {
 
     @Test
     void removeFromBasket_Success() {
-        basketEntity.getItems().add(new BasketItemEntity(1L, 2));
+        basketEntity.getItems().add(BasketItemEntity.builder()
+                .recordId(1L)
+                .quantity(2)
+                .build());
         when(basketRepository.findByUserId(1L)).thenReturn(Optional.of(basketEntity));
 
         assertDoesNotThrow(() -> basketUseCase.removeFromBasket(1L, 1L));
@@ -166,7 +173,10 @@ class BasketUseCaseImplTest {
 
     @Test
     void clearBasket_ExistingBasket() {
-        basketEntity.getItems().add(new BasketItemEntity(1L, 2));
+        basketEntity.getItems().add(BasketItemEntity.builder()
+                .recordId(1L)
+                .quantity(2)
+                .build());
         when(basketRepository.findByUserId(1L)).thenReturn(Optional.of(basketEntity));
 
         assertDoesNotThrow(() -> basketUseCase.clearBasket(1L));

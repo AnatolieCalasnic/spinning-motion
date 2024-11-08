@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +44,7 @@ class RecordControllerTest {
         createRecordRequest = CreateRecordRequest.builder()
                 .title("Test Album")
                 .artist("Test Artist")
-                .genre("Rock")
+                .genreId(1L)
                 .price(11.99)
                 .year(2023)
                 .condition("New")
@@ -54,7 +55,7 @@ class RecordControllerTest {
                 .id(1L)
                 .title("Test Album")
                 .artist("Test Artist")
-                .genre("Rock")
+                .genreId(1L)
                 .price(11.99)
                 .year(2023)
                 .condition("New")
@@ -65,7 +66,7 @@ class RecordControllerTest {
                 .id(1L)
                 .title("Test Album")
                 .artist("Test Artist")
-                .genre("Rock")
+                .genreId(1L)
                 .price(25.99)
                 .year(2023)
                 .condition("New")
@@ -76,7 +77,7 @@ class RecordControllerTest {
                 .id(1L)
                 .title("Updated Album")
                 .artist("Updated Artist")
-                .genre("Jazz")
+                .genreId(3L)
                 .price(29.99)
                 .year(2024)
                 .condition("Used")
@@ -87,7 +88,7 @@ class RecordControllerTest {
                 .id(1L)
                 .title("Updated Album")
                 .artist("Updated Artist")
-                .genre("Jazz")
+                .genreId(3L)
                 .price(34.99)
                 .year(2024)
                 .condition("Used")
@@ -106,7 +107,7 @@ class RecordControllerTest {
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.title").value("Test Album"))
                 .andExpect(jsonPath("$.artist").value("Test Artist"))
-                .andExpect(jsonPath("$.genre").value("Rock"))
+                .andExpect(jsonPath("$.genreId").value(1L))
                 .andExpect(jsonPath("$.price").value(11.99))
                 .andExpect(jsonPath("$.year").value(2023))
                 .andExpect(jsonPath("$.condition").value("New"))
@@ -124,7 +125,7 @@ class RecordControllerTest {
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.title").value("Test Album"))
                 .andExpect(jsonPath("$.artist").value("Test Artist"))
-                .andExpect(jsonPath("$.genre").value("Rock"))
+                .andExpect(jsonPath("$.genreId").value(1L))
                 .andExpect(jsonPath("$.price").value(25.99))
                 .andExpect(jsonPath("$.year").value(2023))
                 .andExpect(jsonPath("$.condition").value("New"))
@@ -155,7 +156,7 @@ class RecordControllerTest {
                 .andExpect(jsonPath("$[0].id").value(1L))
                 .andExpect(jsonPath("$[0].title").value("Test Album"))
                 .andExpect(jsonPath("$[0].artist").value("Test Artist"))
-                .andExpect(jsonPath("$[0].genre").value("Rock"))
+                .andExpect(jsonPath("$[0].genreId").value(1L))
                 .andExpect(jsonPath("$[0].price").value(25.99))
                 .andExpect(jsonPath("$[0].year").value(2023))
                 .andExpect(jsonPath("$[0].condition").value("New"))
@@ -163,7 +164,55 @@ class RecordControllerTest {
 
         verify(recordUseCase, times(1)).getAllRecords();
     }
+    @Test
+    void getRecordsByGenre_Success() throws Exception {
+        // Arrange
+        List<GetRecordResponse> records = Arrays.asList(getRecordResponse);
+        when(recordUseCase.getRecordsByGenre("Rock")).thenReturn(records);
 
+        // Act & Assert
+        mockMvc.perform(get("/records/genre/Rock"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1L))
+                .andExpect(jsonPath("$[0].title").value("Test Album"))
+                .andExpect(jsonPath("$[0].artist").value("Test Artist"))
+                .andExpect(jsonPath("$[0].genreId").value(1L))
+                .andExpect(jsonPath("$[0].price").value(25.99))
+                .andExpect(jsonPath("$[0].year").value(2023))
+                .andExpect(jsonPath("$[0].condition").value("New"))
+                .andExpect(jsonPath("$[0].quantity").value(10));
+
+        verify(recordUseCase, times(1)).getRecordsByGenre("Rock");
+    }
+
+    @Test
+    void getRecordsByGenre_EmptyList() throws Exception {
+        // Arrange
+        when(recordUseCase.getRecordsByGenre("NonExistentGenre"))
+                .thenReturn(Collections.emptyList());
+
+        // Act & Assert
+        mockMvc.perform(get("/records/genre/NonExistentGenre"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+
+        verify(recordUseCase, times(1)).getRecordsByGenre("NonExistentGenre");
+    }
+
+    @Test
+    void getRecordsByGenre_ThrowsException() throws Exception {
+        // Arrange
+        when(recordUseCase.getRecordsByGenre(any()))
+                .thenThrow(new RuntimeException("Unexpected error"));
+
+        // Act & Assert
+        mockMvc.perform(get("/records/genre/Rock"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().string("An error occurred: Unexpected error"));
+
+        verify(recordUseCase, times(1)).getRecordsByGenre("Rock");
+    }
     @Test
     void updateRecord_Success() throws Exception {
         when(recordUseCase.updateRecord(any(UpdateRecordRequest.class))).thenReturn(updateRecordResponse);
@@ -175,7 +224,7 @@ class RecordControllerTest {
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.title").value("Updated Album"))
                 .andExpect(jsonPath("$.artist").value("Updated Artist"))
-                .andExpect(jsonPath("$.genre").value("Jazz"))
+                .andExpect(jsonPath("$.genreId").value(3L))
                 .andExpect(jsonPath("$.price").value(34.99))
                 .andExpect(jsonPath("$.year").value(2024))
                 .andExpect(jsonPath("$.condition").value("Used"))

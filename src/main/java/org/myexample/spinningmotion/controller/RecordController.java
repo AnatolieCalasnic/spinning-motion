@@ -13,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/records")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:3000")
 public class RecordController {
     private final RecordUseCase recordUseCase;
 
@@ -32,7 +33,11 @@ public class RecordController {
     public ResponseEntity<List<GetRecordResponse>> getAllRecords() {
         return ResponseEntity.ok(recordUseCase.getAllRecords());
     }
-
+    @GetMapping("/genre/{genreName}")
+    public ResponseEntity<List<GetRecordResponse>> getRecordsByGenre(@PathVariable String genreName) {
+        List<GetRecordResponse> response = recordUseCase.getRecordsByGenre(genreName);
+        return ResponseEntity.ok(response);
+    }
     @PutMapping("/{id}")
     public ResponseEntity<UpdateRecordResponse> updateRecord(@RequestBody UpdateRecordRequest request, @PathVariable Long id) {
         request.setId(id);
@@ -50,5 +55,10 @@ public class RecordController {
     @ExceptionHandler(RecordNotFoundException.class)
     public ResponseEntity<String> handleRecordNotFound(RecordNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<String> handleGeneralException(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("An error occurred: " + ex.getMessage());
     }
 }

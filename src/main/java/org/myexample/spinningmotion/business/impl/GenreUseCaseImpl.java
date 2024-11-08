@@ -52,7 +52,6 @@ public class GenreUseCaseImpl implements GenreUseCase {
         return GetGenreResponse.builder()
                 .id(entity.getId())
                 .name(entity.getName())
-                .description(entity.getDescription())
                 .build();
     }
 
@@ -60,7 +59,6 @@ public class GenreUseCaseImpl implements GenreUseCase {
         return Genre.builder()
                 .id(entity.getId())
                 .name(entity.getName())
-                .description(entity.getDescription())
                 .build();
     }
 }

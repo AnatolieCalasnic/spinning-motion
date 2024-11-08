@@ -1,6 +1,7 @@
 package org.myexample.spinningmotion.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.hibernate.AnnotationException;
 import org.myexample.spinningmotion.business.interfc.PurchaseHistoryUseCase;
 import org.myexample.spinningmotion.domain.purchase_history.*;
 import org.myexample.spinningmotion.business.exception.*;
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/purchase-history")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:3000")
 public class PurchaseHistoryController {
 
     private final PurchaseHistoryUseCase purchaseHistoryUseCase;
@@ -44,5 +46,15 @@ public class PurchaseHistoryController {
     @ExceptionHandler(PurchaseHistoryNotFoundException.class)
     public ResponseEntity<String> handlePurchaseHistoryNotFound(PurchaseHistoryNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+    @ExceptionHandler(AnnotationException.class)
+    public ResponseEntity<String> handleAnnotationException(AnnotationException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Error in entity mapping: " + ex.getMessage());
+    }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<String> handleGeneralException(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("An error occurred: " + ex.getMessage());
     }
 }

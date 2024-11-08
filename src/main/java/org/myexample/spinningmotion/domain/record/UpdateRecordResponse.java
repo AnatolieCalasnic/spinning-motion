@@ -14,7 +14,7 @@ public class UpdateRecordResponse {
     private Long id;
     private String title;
     private String artist;
-    private String genre;
+    private Long genreId;
     private Double price;
     private Integer year;
     private String condition;

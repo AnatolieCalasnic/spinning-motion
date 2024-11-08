@@ -92,7 +92,7 @@ public class UserUseCaseImpl implements UserUseCase {
                 .city(entity.getCity())
                 .region(entity.getRegion())
                 .phonenum(entity.getPhonenum())
-                .isAdmin(entity.isAdmin())
+                .isAdmin(entity.getIsAdmin())
                 .build();
     }
 
@@ -108,7 +108,7 @@ public class UserUseCaseImpl implements UserUseCase {
                 .city(entity.getCity())
                 .region(entity.getRegion())
                 .phonenum(entity.getPhonenum())
-                .isAdmin(entity.isAdmin())
+                .isAdmin(entity.getIsAdmin())
                 .build();
     }
 
@@ -124,7 +124,7 @@ public class UserUseCaseImpl implements UserUseCase {
                 .city(entity.getCity())
                 .region(entity.getRegion())
                 .phonenum(entity.getPhonenum())
-                .isAdmin(entity.isAdmin())
+                .isAdmin(entity.getIsAdmin())
                 .build();
     }
 

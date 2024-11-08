@@ -1,7 +1,6 @@
 package org.myexample.spinningmotion.business.impl;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.InjectMocks;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,10 +10,10 @@ import org.myexample.spinningmotion.business.exception.PurchaseHistoryNotFoundEx
 import org.myexample.spinningmotion.domain.purchase_history.*;
 import org.myexample.spinningmotion.persistence.PurchaseHistoryRepository;
 import org.myexample.spinningmotion.persistence.entity.PurchaseHistoryEntity;
-import org.myexample.spinningmotion.persistence.entity.PurchaseItemEntity;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,10 +22,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class PurchaseHistoryUseCaseImplTest {
+class PurchaseHistoryUseCaseImplTest {
 
     @Mock
     private PurchaseHistoryRepository purchaseHistoryRepository;
+
 
     @InjectMocks
     private PurchaseHistoryUseCaseImpl purchaseHistoryUseCase;
@@ -36,14 +36,12 @@ public class PurchaseHistoryUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        List<PurchaseItem> items = Arrays.asList(
-                PurchaseItem.builder().recordId(1L).quantity(2).price(10.0).build(),
-                PurchaseItem.builder().recordId(2L).quantity(1).price(20.0).build()
-        );
-
         createRequest = CreatePurchaseHistoryRequest.builder()
                 .userId(1L)
-                .items(items)
+                .recordId(1L)
+                .quantity(2)
+                .price(10.0)
+                .totalAmount(40.0)
                 .build();
 
         purchaseHistoryEntity = PurchaseHistoryEntity.builder()
@@ -52,10 +50,9 @@ public class PurchaseHistoryUseCaseImplTest {
                 .purchaseDate(LocalDateTime.now())
                 .status("COMPLETED")
                 .totalAmount(40.0)
-                .items(Arrays.asList(
-                        PurchaseItemEntity.builder().recordId(1L).quantity(2).price(10.0).build(),
-                        PurchaseItemEntity.builder().recordId(2L).quantity(1).price(20.0).build()
-                ))
+                .recordId(1L)
+                .quantity(2)
+                .price(10.0)
                 .build();
     }
 
@@ -68,6 +65,9 @@ public class PurchaseHistoryUseCaseImplTest {
         assertNotNull(response);
         assertEquals(purchaseHistoryEntity.getId(), response.getId());
         assertEquals(purchaseHistoryEntity.getTotalAmount(), response.getTotalAmount());
+        assertEquals(purchaseHistoryEntity.getRecordId(), response.getRecordId());
+        assertEquals(purchaseHistoryEntity.getQuantity(), response.getQuantity());
+        assertEquals(purchaseHistoryEntity.getPrice(), response.getPrice());
 
         verify(purchaseHistoryRepository).save(any(PurchaseHistoryEntity.class));
     }
@@ -81,6 +81,9 @@ public class PurchaseHistoryUseCaseImplTest {
         assertNotNull(response);
         assertEquals(purchaseHistoryEntity.getId(), response.getId());
         assertEquals(purchaseHistoryEntity.getTotalAmount(), response.getTotalAmount());
+        assertEquals(purchaseHistoryEntity.getRecordId(), response.getRecordId());
+        assertEquals(purchaseHistoryEntity.getQuantity(), response.getQuantity());
+        assertEquals(purchaseHistoryEntity.getPrice(), response.getPrice());
 
         verify(purchaseHistoryRepository).findById(1L);
     }
@@ -103,10 +106,35 @@ public class PurchaseHistoryUseCaseImplTest {
         assertNotNull(responses);
         assertEquals(1, responses.size());
         assertEquals(purchaseHistoryEntity.getId(), responses.get(0).getId());
+        assertEquals(purchaseHistoryEntity.getRecordId(), responses.get(0).getRecordId());
+        assertEquals(purchaseHistoryEntity.getQuantity(), responses.get(0).getQuantity());
+        assertEquals(purchaseHistoryEntity.getPrice(), responses.get(0).getPrice());
 
         verify(purchaseHistoryRepository).findAllByUserId(1L);
     }
+    @Test
+    void createPurchaseHistory_ValidatesAllFields() {
+        when(purchaseHistoryRepository.save(any(PurchaseHistoryEntity.class))).thenReturn(purchaseHistoryEntity);
 
+        CreatePurchaseHistoryResponse response = purchaseHistoryUseCase.createPurchaseHistory(createRequest);
+
+        assertNotNull(response);
+        assertEquals(purchaseHistoryEntity.getUserId(), response.getUserId());
+        assertEquals(purchaseHistoryEntity.getStatus(), response.getStatus());
+        assertEquals(purchaseHistoryEntity.getPurchaseDate(), response.getPurchaseDate());
+        verify(purchaseHistoryRepository).save(any(PurchaseHistoryEntity.class));
+    }
+
+    @Test
+    void getAllPurchaseHistories_EmptyList() {
+        when(purchaseHistoryRepository.findAllByUserId(1L)).thenReturn(Collections.emptyList());
+
+        List<GetPurchaseHistoryResponse> responses = purchaseHistoryUseCase.getAllPurchaseHistories(1L);
+
+        assertNotNull(responses);
+        assertTrue(responses.isEmpty());
+        verify(purchaseHistoryRepository).findAllByUserId(1L);
+    }
     @Test
     void deletePurchaseHistory_Success() {
         when(purchaseHistoryRepository.findById(1L)).thenReturn(Optional.of(purchaseHistoryEntity));

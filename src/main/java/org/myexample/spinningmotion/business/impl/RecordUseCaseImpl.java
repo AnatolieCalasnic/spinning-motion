@@ -5,7 +5,9 @@ import org.myexample.spinningmotion.business.exception.InvalidInputException;
 import org.myexample.spinningmotion.business.exception.RecordNotFoundException;
 import org.myexample.spinningmotion.business.interfc.RecordUseCase;
 import org.myexample.spinningmotion.domain.record.*;
+import org.myexample.spinningmotion.persistence.GenreRepository;
 import org.myexample.spinningmotion.persistence.RecordRepository;
+import org.myexample.spinningmotion.persistence.entity.GenreEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +18,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RecordUseCaseImpl implements RecordUseCase {
     private final RecordRepository recordRepository;
-
+    private final GenreRepository genreRepository;
     @Override
     public CreateRecordResponse createRecord(CreateRecordRequest request) {
         if (request.getPrice() <= 0) {
@@ -25,8 +27,10 @@ public class RecordUseCaseImpl implements RecordUseCase {
         if (recordRepository.existsByTitle(request.getTitle())) {
             throw new IllegalArgumentException("Record with this title already exists");
         }
+        GenreEntity genre = genreRepository.findById(request.getGenreId())
+                .orElseThrow(() -> new InvalidInputException("Genre not found: " + request.getGenreId()));
 
-        RecordEntity entity = convertToEntity(request);
+        RecordEntity entity = convertToEntity(request, genre);
         RecordEntity savedEntity = recordRepository.save(entity);
         return convertToCreateResponse(savedEntity);
     }
@@ -63,12 +67,26 @@ public class RecordUseCaseImpl implements RecordUseCase {
         }
         recordRepository.deleteById(id);
     }
-
-    private RecordEntity convertToEntity(CreateRecordRequest request) {
+    @Override
+    public List<GetRecordResponse> getRecordsByGenre(String genreName) {
+        return recordRepository.findByGenreName(genreName.toLowerCase())
+                .stream()
+                .map(recordEntity -> GetRecordResponse.builder()
+                        .id(recordEntity.getId())
+                        .title(recordEntity.getTitle())
+                        .artist(recordEntity.getArtist())
+                        .price(recordEntity.getPrice())
+                        .year(recordEntity.getYear())
+                        .condition(recordEntity.getCondition())
+                        .quantity(recordEntity.getQuantity())
+                        .build())
+                .collect(Collectors.toList());
+    }
+    private RecordEntity convertToEntity(CreateRecordRequest request, GenreEntity genre) {
         return RecordEntity.builder()
                 .title(request.getTitle())
                 .artist(request.getArtist())
-                .genre(request.getGenre())
+                .genre(genre)
                 .price(request.getPrice())
                 .year(request.getYear())
                 .condition(request.getCondition())
@@ -81,7 +99,7 @@ public class RecordUseCaseImpl implements RecordUseCase {
                 .id(entity.getId())
                 .title(entity.getTitle())
                 .artist(entity.getArtist())
-                .genre(entity.getGenre())
+                .genreId(entity.getGenre().getId())
                 .price(entity.getPrice())
                 .year(entity.getYear())
                 .condition(entity.getCondition())
@@ -94,7 +112,7 @@ public class RecordUseCaseImpl implements RecordUseCase {
                 .id(entity.getId())
                 .title(entity.getTitle())
                 .artist(entity.getArtist())
-                .genre(entity.getGenre())
+                .genreId(entity.getGenre().getId())  // Get genre name
                 .price(entity.getPrice())
                 .year(entity.getYear())
                 .condition(entity.getCondition())
@@ -107,7 +125,7 @@ public class RecordUseCaseImpl implements RecordUseCase {
                 .id(entity.getId())
                 .title(entity.getTitle())
                 .artist(entity.getArtist())
-                .genre(entity.getGenre())
+                .genreId(entity.getGenre().getId())
                 .price(entity.getPrice())
                 .year(entity.getYear())
                 .condition(entity.getCondition())
@@ -116,9 +134,12 @@ public class RecordUseCaseImpl implements RecordUseCase {
     }
 
     private void updateEntityFromRequest(RecordEntity entity, UpdateRecordRequest request) {
+        GenreEntity genre = genreRepository.findById(request.getGenreId())
+                .orElseThrow(() -> new InvalidInputException("Genre not found: " + request.getId()));
+
         entity.setTitle(request.getTitle());
         entity.setArtist(request.getArtist());
-        entity.setGenre(request.getGenre());
+        entity.setGenre(genre);  // Set GenreEntity
         entity.setPrice(request.getPrice());
         entity.setYear(request.getYear());
         entity.setCondition(request.getCondition());

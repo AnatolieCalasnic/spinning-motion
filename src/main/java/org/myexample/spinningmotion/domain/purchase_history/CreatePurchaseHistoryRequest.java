@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
 
 @Data
 @Builder
@@ -12,5 +11,8 @@ import java.util.List;
 @AllArgsConstructor
 public class CreatePurchaseHistoryRequest {
     private Long userId;
-    private List<PurchaseItem> items;
+    private Long recordId;
+    private Integer quantity;
+    private Double price;
+    private Double totalAmount;
 }
