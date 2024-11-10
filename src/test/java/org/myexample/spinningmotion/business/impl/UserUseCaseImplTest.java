@@ -73,7 +73,14 @@ public class UserUseCaseImplTest {
         assertNotNull(response);
         assertEquals(1L, response.getId());
         assertEquals(createUserRequest.getFname(), response.getFname());
+        assertEquals(createUserRequest.getLname(), response.getLname());
         assertEquals(createUserRequest.getEmail(), response.getEmail());
+        assertEquals(createUserRequest.getAddress(), response.getAddress());
+        assertEquals(createUserRequest.getPostalCode(), response.getPostalCode());
+        assertEquals(createUserRequest.getCountry(), response.getCountry());
+        assertEquals(createUserRequest.getCity(), response.getCity());
+        assertEquals(createUserRequest.getRegion(), response.getRegion());
+        assertEquals(createUserRequest.getPhonenum(), response.getPhonenum());
 
         verify(userRepository).existsByEmail(createUserRequest.getEmail());
         verify(userRepository).save(any(UserEntity.class));
@@ -105,9 +112,16 @@ public class UserUseCaseImplTest {
         GetUserResponse response = userUseCase.getUser(new GetUserRequest(1L));
 
         assertNotNull(response);
-        assertEquals(1L, response.getId());
+        assertEquals(userEntity.getId(), response.getId());
         assertEquals(userEntity.getFname(), response.getFname());
+        assertEquals(userEntity.getLname(), response.getLname());
         assertEquals(userEntity.getEmail(), response.getEmail());
+        assertEquals(userEntity.getAddress(), response.getAddress());
+        assertEquals(userEntity.getPostalCode(), response.getPostalCode());
+        assertEquals(userEntity.getCountry(), response.getCountry());
+        assertEquals(userEntity.getCity(), response.getCity());
+        assertEquals(userEntity.getRegion(), response.getRegion());
+        assertEquals(userEntity.getPhonenum(), response.getPhonenum());
 
         verify(userRepository).findById(1L);
     }
@@ -157,9 +171,15 @@ public class UserUseCaseImplTest {
         UpdateUserResponse response = userUseCase.updateUser(updateRequest);
 
         assertNotNull(response);
-        assertEquals(1L, response.getId());
         assertEquals(updateRequest.getFname(), response.getFname());
+        assertEquals(updateRequest.getLname(), response.getLname());
         assertEquals(updateRequest.getEmail(), response.getEmail());
+        assertEquals(updateRequest.getAddress(), response.getAddress());
+        assertEquals(updateRequest.getPostalCode(), response.getPostalCode());
+        assertEquals(updateRequest.getCountry(), response.getCountry());
+        assertEquals(updateRequest.getCity(), response.getCity());
+        assertEquals(updateRequest.getRegion(), response.getRegion());
+        assertEquals(updateRequest.getPhonenum(), response.getPhonenum());
 
         verify(userRepository).findById(1L);
         verify(userRepository).save(any(UserEntity.class));

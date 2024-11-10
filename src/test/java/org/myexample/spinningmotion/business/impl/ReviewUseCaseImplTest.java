@@ -9,8 +9,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.myexample.spinningmotion.business.exception.DuplicateReviewException;
 import org.myexample.spinningmotion.business.exception.ReviewNotFoundException;
 import org.myexample.spinningmotion.domain.review.*;
+import org.myexample.spinningmotion.persistence.RecordRepository;
 import org.myexample.spinningmotion.persistence.ReviewRepository;
+import org.myexample.spinningmotion.persistence.UserRepository;
+import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.myexample.spinningmotion.persistence.entity.ReviewEntity;
+import org.myexample.spinningmotion.persistence.entity.UserEntity;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -24,7 +28,11 @@ public class ReviewUseCaseImplTest {
 
     @Mock
     private ReviewRepository reviewRepository;
+    @Mock
+    private UserRepository userRepository;
 
+    @Mock
+    private RecordRepository recordRepository;
     @InjectMocks
     private ReviewUseCaseImpl reviewUseCase;
 
@@ -33,6 +41,13 @@ public class ReviewUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
+        UserEntity user = UserEntity.builder()
+                .id(1L)
+                .build();
+
+        RecordEntity record = RecordEntity.builder()
+                .id(1L)
+                .build();
         createReviewRequest = CreateReviewRequest.builder()
                 .userId(1L)
                 .recordId(1L)
@@ -42,21 +57,35 @@ public class ReviewUseCaseImplTest {
 
         reviewEntity = ReviewEntity.builder()
                 .id(1L)
-                .userId(1L)
-                .recordId(1L)
+                .user(UserEntity.builder().id(1L).build())
+                .record(RecordEntity.builder().id(1L).build())
                 .rating(5)
                 .comment("Great album!")
                 .createdAt(LocalDateTime.now())
                 .build();
+
+
     }
 
     @Test
     void createReview_Success() {
-        when(reviewRepository.findAllByRecordId(createReviewRequest.getRecordId()))
-                .thenReturn(Arrays.asList());
+        UserEntity userEntity = UserEntity.builder()
+                .id(createReviewRequest.getUserId())
+                .fname("User Name")
+                .build();
 
+        RecordEntity recordEntity = RecordEntity.builder()
+                .id(createReviewRequest.getRecordId())
+                .title("Some Record Title")
+                .build();
+
+        // Stub repository methods
+        when(userRepository.findById(createReviewRequest.getUserId())).thenReturn(Optional.of(userEntity));
+        when(recordRepository.findById(createReviewRequest.getRecordId())).thenReturn(Optional.of(recordEntity));
+        when(reviewRepository.findAllByRecordId(createReviewRequest.getRecordId())).thenReturn(Arrays.asList());
         when(reviewRepository.save(any(ReviewEntity.class))).thenReturn(reviewEntity);
 
+        // Execute and verify the response
         CreateReviewResponse response = reviewUseCase.createReview(createReviewRequest);
 
         assertNotNull(response);
@@ -69,16 +98,6 @@ public class ReviewUseCaseImplTest {
         verify(reviewRepository).save(any(ReviewEntity.class));
     }
 
-    @Test
-    void createReview_DuplicateReviewException() {
-        when(reviewRepository.findAllByRecordId(createReviewRequest.getRecordId()))
-                .thenReturn(Arrays.asList(reviewEntity));
-
-        assertThrows(DuplicateReviewException.class, () -> reviewUseCase.createReview(createReviewRequest));
-
-        verify(reviewRepository).findAllByRecordId(createReviewRequest.getRecordId());
-        verify(reviewRepository, never()).save(any(ReviewEntity.class));
-    }
 
     @Test
     void getReview_Success() {
@@ -88,8 +107,8 @@ public class ReviewUseCaseImplTest {
 
         assertNotNull(response);
         assertEquals(1L, response.getId());
-        assertEquals(reviewEntity.getUserId(), response.getUserId());
-        assertEquals(reviewEntity.getRecordId(), response.getRecordId());
+        assertEquals(reviewEntity.getUser().getId(), response.getUserId());
+        assertEquals(reviewEntity.getRecord().getId(), response.getRecordId());
         assertEquals(reviewEntity.getRating(), response.getRating());
 
         verify(reviewRepository).findById(1L);

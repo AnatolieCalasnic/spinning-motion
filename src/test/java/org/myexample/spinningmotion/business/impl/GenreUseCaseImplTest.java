@@ -36,7 +36,6 @@ class GenreUseCaseImplTest {
         genreEntity = GenreEntity.builder()
                 .id(1L)
                 .name("Rock")
-                .description("Rock music genre")
                 .build();
 
         getGenreRequest = new GetGenreRequest(1L);
@@ -51,7 +50,6 @@ class GenreUseCaseImplTest {
         assertNotNull(response);
         assertEquals(1L, response.getId());
         assertEquals("Rock", response.getName());
-        assertEquals("Rock music genre", response.getDescription());
 
         verify(genreRepository, times(1)).findById(1L);
     }
@@ -69,7 +67,7 @@ class GenreUseCaseImplTest {
     void getAllGenres_MultipleGenres() {
         List<GenreEntity> genreEntities = Arrays.asList(
                 genreEntity,
-                GenreEntity.builder().id(2L).name("Pop").description("Pop music genre").build()
+                GenreEntity.builder().id(2L).name("Pop").build()
         );
 
         when(genreRepository.findAll()).thenReturn(genreEntities);

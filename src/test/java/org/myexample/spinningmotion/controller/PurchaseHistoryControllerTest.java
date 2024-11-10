@@ -1,6 +1,7 @@
 package org.myexample.spinningmotion.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hibernate.AnnotationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -39,15 +41,14 @@ class PurchaseHistoryControllerTest {
 
     @BeforeEach
     void setUp() {
-        PurchaseItem item = PurchaseItem.builder()
-                .recordId(1L)
-                .quantity(2)
-                .price(19.99)
-                .build();
+
 
         createRequest = CreatePurchaseHistoryRequest.builder()
                 .userId(1L)
-                .items(Arrays.asList(item))
+                .recordId(1L)
+                .quantity(2)
+                .price(19.99)
+                .totalAmount(39.98)
                 .build();
 
         createResponse = CreatePurchaseHistoryResponse.builder()
@@ -56,7 +57,9 @@ class PurchaseHistoryControllerTest {
                 .purchaseDate(LocalDateTime.now())
                 .status("Completed")
                 .totalAmount(39.98)
-                .items(Arrays.asList(item))
+                .recordId(1L)
+                .quantity(2)
+                .price(19.99)
                 .build();
 
         getPurchaseHistoryResponse = GetPurchaseHistoryResponse.builder()
@@ -65,7 +68,9 @@ class PurchaseHistoryControllerTest {
                 .purchaseDate(LocalDateTime.now())
                 .status("Completed")
                 .totalAmount(39.98)
-                .items(Arrays.asList(item))
+                .recordId(1L)
+                .quantity(2)
+                .price(19.99)
                 .build();
     }
 
@@ -82,9 +87,9 @@ class PurchaseHistoryControllerTest {
                 .andExpect(jsonPath("$.userId").value(1L))
                 .andExpect(jsonPath("$.status").value("Completed"))
                 .andExpect(jsonPath("$.totalAmount").value(39.98))
-                .andExpect(jsonPath("$.items[0].recordId").value(1L))
-                .andExpect(jsonPath("$.items[0].quantity").value(2))
-                .andExpect(jsonPath("$.items[0].price").value(19.99));
+                .andExpect(jsonPath("$.recordId").value(1L))
+                .andExpect(jsonPath("$.quantity").value(2))
+                .andExpect(jsonPath("$.price").value(19.99));
 
         verify(purchaseHistoryUseCase, times(1)).createPurchaseHistory(any(CreatePurchaseHistoryRequest.class));
     }
@@ -100,9 +105,9 @@ class PurchaseHistoryControllerTest {
                 .andExpect(jsonPath("$[0].userId").value(1L))
                 .andExpect(jsonPath("$[0].status").value("Completed"))
                 .andExpect(jsonPath("$[0].totalAmount").value(39.98))
-                .andExpect(jsonPath("$[0].items[0].recordId").value(1L))
-                .andExpect(jsonPath("$[0].items[0].quantity").value(2))
-                .andExpect(jsonPath("$[0].items[0].price").value(19.99));
+                .andExpect(jsonPath("$[0].recordId").value(1L))
+                .andExpect(jsonPath("$[0].quantity").value(2))
+                .andExpect(jsonPath("$[0].price").value(19.99));
 
         verify(purchaseHistoryUseCase, times(1)).getAllPurchaseHistories(1L);
     }
@@ -118,13 +123,23 @@ class PurchaseHistoryControllerTest {
                 .andExpect(jsonPath("$.userId").value(1L))
                 .andExpect(jsonPath("$.status").value("Completed"))
                 .andExpect(jsonPath("$.totalAmount").value(39.98))
-                .andExpect(jsonPath("$.items[0].recordId").value(1L))
-                .andExpect(jsonPath("$.items[0].quantity").value(2))
-                .andExpect(jsonPath("$.items[0].price").value(19.99));
+                .andExpect(jsonPath("$.recordId").value(1L))
+                .andExpect(jsonPath("$.quantity").value(2))
+                .andExpect(jsonPath("$.price").value(19.99));
 
         verify(purchaseHistoryUseCase, times(1)).getPurchaseHistory(any(GetPurchaseHistoryRequest.class));
     }
+    @Test
+    void getAllPurchaseHistories_EmptyList() throws Exception {
+        when(purchaseHistoryUseCase.getAllPurchaseHistories(1L)).thenReturn(Collections.emptyList());
 
+        mockMvc.perform(get("/purchase-history/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+
+        verify(purchaseHistoryUseCase).getAllPurchaseHistories(1L);
+    }
     @Test
     void getPurchaseHistory_NotFound() throws Exception {
         when(purchaseHistoryUseCase.getPurchaseHistory(any(GetPurchaseHistoryRequest.class)))
@@ -136,7 +151,35 @@ class PurchaseHistoryControllerTest {
 
         verify(purchaseHistoryUseCase, times(1)).getPurchaseHistory(any(GetPurchaseHistoryRequest.class));
     }
+    // Add these tests to PurchaseHistoryControllerTest class
 
+    @Test
+    void handleAnnotationException_ShouldReturnBadRequest() throws Exception {
+        // Given
+        when(purchaseHistoryUseCase.createPurchaseHistory(any(CreatePurchaseHistoryRequest.class)))
+                .thenThrow(new AnnotationException("Invalid mapping"));
+
+        // When & Then
+        mockMvc.perform(post("/purchase-history")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Error in entity mapping: Invalid mapping"));
+    }
+
+    @Test
+    void handleGeneralException_ShouldReturnInternalServerError() throws Exception {
+        // Given
+        when(purchaseHistoryUseCase.createPurchaseHistory(any(CreatePurchaseHistoryRequest.class)))
+                .thenThrow(new RuntimeException("Unexpected error"));
+
+        // When & Then
+        mockMvc.perform(post("/purchase-history")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().string("An error occurred: Unexpected error"));
+    }
     @Test
     void deletePurchaseHistory_Success() throws Exception {
         doNothing().when(purchaseHistoryUseCase).deletePurchaseHistory(1L);

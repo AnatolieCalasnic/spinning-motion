@@ -2,10 +2,13 @@ package org.myexample.spinningmotion.business.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.myexample.spinningmotion.business.exception.DuplicateReviewException;
+import org.myexample.spinningmotion.business.exception.RecordNotFoundException;
 import org.myexample.spinningmotion.business.exception.ReviewNotFoundException;
 import org.myexample.spinningmotion.business.interfc.ReviewUseCase;
 import org.myexample.spinningmotion.domain.review.*;
+import org.myexample.spinningmotion.persistence.RecordRepository;
 import org.myexample.spinningmotion.persistence.ReviewRepository;
+import org.myexample.spinningmotion.persistence.UserRepository;
 import org.myexample.spinningmotion.persistence.entity.ReviewEntity;
 import org.springframework.stereotype.Service;
 
@@ -17,12 +20,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReviewUseCaseImpl implements ReviewUseCase {
     private final ReviewRepository reviewRepository;
+    private final UserRepository userRepository;
+    private final RecordRepository recordRepository;
 
     @Override
     public CreateReviewResponse createReview(CreateReviewRequest request) {
         List<ReviewEntity> existingReviews = reviewRepository.findAllByRecordId(request.getRecordId());
         boolean reviewExists = existingReviews.stream()
-                .anyMatch(review -> review.getUserId().equals(request.getUserId()));
+                .anyMatch(review -> review.getUser().getId().equals(request.getUserId()));
 
         if (reviewExists) {
             throw new DuplicateReviewException();
@@ -67,8 +72,8 @@ public class ReviewUseCaseImpl implements ReviewUseCase {
 
     private ReviewEntity convertToEntity(CreateReviewRequest request) {
         return ReviewEntity.builder()
-                .userId(request.getUserId())
-                .recordId(request.getRecordId())
+                .user(userRepository.findById(request.getUserId()).orElseThrow())
+                .record(recordRepository.findById(request.getRecordId()).orElseThrow(() -> new RecordNotFoundException("Record not found with id: " + request.getRecordId())))
                 .rating(request.getRating())
                 .comment(request.getComment())
                 .createdAt(LocalDateTime.now())
@@ -78,8 +83,8 @@ public class ReviewUseCaseImpl implements ReviewUseCase {
     private CreateReviewResponse convertToCreateResponse(ReviewEntity entity) {
         return CreateReviewResponse.builder()
                 .id(entity.getId())
-                .userId(entity.getUserId())
-                .recordId(entity.getRecordId())
+                .userId(entity.getUser().getId())
+                .recordId(entity.getRecord().getId())
                 .rating(entity.getRating())
                 .comment(entity.getComment())
                 .createdAt(entity.getCreatedAt())
@@ -89,8 +94,8 @@ public class ReviewUseCaseImpl implements ReviewUseCase {
     private GetReviewResponse convertToGetResponse(ReviewEntity entity) {
         return GetReviewResponse.builder()
                 .id(entity.getId())
-                .userId(entity.getUserId())
-                .recordId(entity.getRecordId())
+                .userId(entity.getUser().getId())
+                .recordId(entity.getRecord().getId())
                 .rating(entity.getRating())
                 .comment(entity.getComment())
                 .createdAt(entity.getCreatedAt())

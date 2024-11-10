@@ -2,6 +2,7 @@ stages:
     - build 
     - test
     - docker
+    - sonarqube-check
 build: 
     stage: build 
     script: 
@@ -10,3 +11,8 @@ test:
     stage: test 
     script:
          - ./gradlew test
+sonarqube-check:
+    stage: sonarqube-check
+    script:
+        - ./gradlew test jacocoTestReport
+

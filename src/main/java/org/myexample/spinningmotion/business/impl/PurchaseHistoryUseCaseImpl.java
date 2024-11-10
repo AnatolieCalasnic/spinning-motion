@@ -6,7 +6,6 @@ import org.myexample.spinningmotion.business.interfc.PurchaseHistoryUseCase;
 import org.myexample.spinningmotion.domain.purchase_history.*;
 import org.myexample.spinningmotion.persistence.PurchaseHistoryRepository;
 import org.myexample.spinningmotion.persistence.entity.PurchaseHistoryEntity;
-import org.myexample.spinningmotion.persistence.entity.PurchaseItemEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -20,23 +19,45 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
 
     @Override
     public CreatePurchaseHistoryResponse createPurchaseHistory(CreatePurchaseHistoryRequest request) {
-        PurchaseHistoryEntity entity = PurchaseHistoryEntity.builder()
+        PurchaseHistoryEntity purchaseHistory = PurchaseHistoryEntity.builder()
                 .userId(request.getUserId())
                 .purchaseDate(LocalDateTime.now())
                 .status("COMPLETED")
-                .totalAmount(calculateTotalAmount(request.getItems()))
-                .items(convertToPurchaseItemEntities(request.getItems()))
+                .totalAmount(request.getTotalAmount())
+                .recordId(request.getRecordId())
+                .quantity(request.getQuantity())
+                .price(request.getPrice())
                 .build();
 
-        PurchaseHistoryEntity savedEntity = purchaseHistoryRepository.save(entity);
-        return convertToCreateResponse(savedEntity);
+        PurchaseHistoryEntity savedPurchaseHistory = purchaseHistoryRepository.save(purchaseHistory);
+
+        return CreatePurchaseHistoryResponse.builder()
+                .id(savedPurchaseHistory.getId())
+                .userId(savedPurchaseHistory.getUserId())
+                .purchaseDate(savedPurchaseHistory.getPurchaseDate())
+                .status(savedPurchaseHistory.getStatus())
+                .totalAmount(savedPurchaseHistory.getTotalAmount())
+                .recordId(savedPurchaseHistory.getRecordId())
+                .quantity(savedPurchaseHistory.getQuantity())
+                .price(savedPurchaseHistory.getPrice())
+                .build();
     }
 
     @Override
     public GetPurchaseHistoryResponse getPurchaseHistory(GetPurchaseHistoryRequest request) {
         PurchaseHistoryEntity entity = purchaseHistoryRepository.findById(request.getId())
                 .orElseThrow(() -> new PurchaseHistoryNotFoundException("Purchase history not found with id: " + request.getId()));
-        return convertToGetResponse(entity);
+
+        return GetPurchaseHistoryResponse.builder()
+                .id(entity.getId())
+                .userId(entity.getUserId())
+                .purchaseDate(entity.getPurchaseDate())
+                .status(entity.getStatus())
+                .totalAmount(entity.getTotalAmount())
+                .recordId(entity.getRecordId())
+                .quantity(entity.getQuantity())
+                .price(entity.getPrice())
+                .build();
     }
 
     @Override
@@ -55,33 +76,6 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
         purchaseHistoryRepository.deleteById(id);
     }
 
-    private Double calculateTotalAmount(List<PurchaseItem> items) {
-        return items.stream()
-                .mapToDouble(item -> item.getPrice() * item.getQuantity())
-                .sum();
-    }
-
-    private List<PurchaseItemEntity> convertToPurchaseItemEntities(List<PurchaseItem> items) {
-        return items.stream()
-                .map(item -> PurchaseItemEntity.builder()
-                        .recordId(item.getRecordId())
-                        .quantity(item.getQuantity())
-                        .price(item.getPrice())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    private CreatePurchaseHistoryResponse convertToCreateResponse(PurchaseHistoryEntity entity) {
-        return CreatePurchaseHistoryResponse.builder()
-                .id(entity.getId())
-                .userId(entity.getUserId())
-                .purchaseDate(entity.getPurchaseDate())
-                .status(entity.getStatus())
-                .totalAmount(entity.getTotalAmount())
-                .items(convertToPurchaseItems(entity.getItems()))
-                .build();
-    }
-
     private GetPurchaseHistoryResponse convertToGetResponse(PurchaseHistoryEntity entity) {
         return GetPurchaseHistoryResponse.builder()
                 .id(entity.getId())
@@ -89,17 +83,9 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
                 .purchaseDate(entity.getPurchaseDate())
                 .status(entity.getStatus())
                 .totalAmount(entity.getTotalAmount())
-                .items(convertToPurchaseItems(entity.getItems()))
+                .recordId(entity.getRecordId())
+                .quantity(entity.getQuantity())
+                .price(entity.getPrice())
                 .build();
-    }
-
-    private List<PurchaseItem> convertToPurchaseItems(List<PurchaseItemEntity> itemEntities) {
-        return itemEntities.stream()
-                .map(entity -> PurchaseItem.builder()
-                        .recordId(entity.getRecordId())
-                        .quantity(entity.getQuantity())
-                        .price(entity.getPrice())
-                        .build())
-                .collect(Collectors.toList());
     }
 }

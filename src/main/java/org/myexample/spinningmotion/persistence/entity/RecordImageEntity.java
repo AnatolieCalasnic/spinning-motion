@@ -1,28 +1,30 @@
 package org.myexample.spinningmotion.persistence.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
 
 @Entity
-@Table(name = "basket")
+@Table(name = "record_images")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BasketEntity {
+public class RecordImageEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull
-    @Column(name = "user_id")
-    private Long userId;
+    @ManyToOne
+    @JoinColumn(name = "record_id", nullable = false)
+    private RecordEntity record;
 
-    @OneToMany(mappedBy = "basket", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<BasketItemEntity> items;
+    @Lob
+    @Column(name = "image_data", columnDefinition = "MEDIUMBLOB")
+    private byte[] imageData;
+
+    @Column(name = "image_type")
+    private String imageType;
 }
