@@ -2,6 +2,7 @@ stages:
     - build 
     - test
     - docker
+    - sonarqube-check
 build: 
     stage: build 
     script: 
