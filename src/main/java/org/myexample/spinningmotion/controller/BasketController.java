@@ -7,6 +7,9 @@ import org.myexample.spinningmotion.business.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
 @RestController
 @RequestMapping("/basket")
 @RequiredArgsConstructor
@@ -22,9 +25,21 @@ public class BasketController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<String> addToBasket(@RequestBody AddToBasketRequest request) {
-        basketUseCase.addToBasket(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body("Item added to basket");
+    public ResponseEntity<?> addToBasket(@RequestBody AddToBasketRequest request) {
+        try {
+            basketUseCase.addToBasket(request);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(Map.of("message", "Item added to basket successfully"));
+        } catch (RecordNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Record Not Found", "message", e.getMessage()));
+        } catch (OutOfStockException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Out of Stock", "message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Internal Server Error", "message", "An unexpected error occurred"));
+        }
     }
 
     @PutMapping("/update")

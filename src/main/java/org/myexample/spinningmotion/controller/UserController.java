@@ -9,6 +9,7 @@ import org.myexample.spinningmotion.business.interfc.UserUseCase;
 import org.myexample.spinningmotion.domain.user.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,9 +20,11 @@ import java.util.List;
 public class UserController {
 
     private final UserUseCase userUseCase;
+    private final PasswordEncoder passwordEncoder;
 
     @PostMapping("/user")
     public ResponseEntity<CreateUserResponse> newUser(@Valid @RequestBody CreateUserRequest request) {
+        request.setPassword(passwordEncoder.encode(request.getPassword()));
         CreateUserResponse response = userUseCase.createUser(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }

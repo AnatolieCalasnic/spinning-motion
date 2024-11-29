@@ -11,6 +11,17 @@ test:
     stage: test 
     script:
          - ./gradlew test
+docker:
+    stage: deploy
+    script:
+        - docker stop spinning-motion; if ($LASTEXITCODE -eq 1) { exit 0 }
+        - docker rm spinning-motion; if ($LASTEXITCODE -eq 1) { exit 0 }
+        - docker build -t spinning-motion .
+        - docker run -d --name spinning-motion --net=spinning_network -p 8093:8080 --env spring_profiles_active=staging spinning-motion
+    only:
+        - main
+    dependencies:
+        - build
 sonarqube-check:
     stage: sonarqube-check
     script:

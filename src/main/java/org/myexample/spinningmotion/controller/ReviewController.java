@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/reviews")
@@ -32,19 +33,28 @@ public class ReviewController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<GetReviewResponse> getReview(@PathVariable Long id) {
+    public ResponseEntity<?> getReview(@PathVariable Long id) {
         try {
             GetReviewResponse response = reviewUseCase.getReview(new GetReviewRequest(id));
             return ResponseEntity.ok(response);
-        }
-        catch (ReviewNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (ReviewNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Review Not Found", "message", e.getMessage()));
         }
     }
 
     @GetMapping("/record/{recordId}")
-    public ResponseEntity<List<GetReviewResponse>> getAllReviewsByRecordId(@PathVariable Long recordId) {
-        return ResponseEntity.ok(reviewUseCase.getAllReviewsByRecordId(recordId));
+    public ResponseEntity<?> getAllReviewsByRecordId(@PathVariable Long recordId) {
+        try {
+            List<GetReviewResponse> reviews = reviewUseCase.getAllReviewsByRecordId(recordId);
+            if (reviews.isEmpty()) {
+                throw new ReviewNotFoundException("No reviews found for record id: " + recordId);
+            }
+            return ResponseEntity.ok(reviews);
+        } catch (ReviewNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Reviews Not Found", "message", e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}")
