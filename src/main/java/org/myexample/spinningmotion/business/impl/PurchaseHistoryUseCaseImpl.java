@@ -1,24 +1,45 @@
 package org.myexample.spinningmotion.business.impl;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.myexample.spinningmotion.business.exception.InsufficientQuantityException;
 import org.myexample.spinningmotion.business.exception.PurchaseHistoryNotFoundException;
+import org.myexample.spinningmotion.business.exception.RecordNotFoundException;
 import org.myexample.spinningmotion.business.interfc.PurchaseHistoryUseCase;
 import org.myexample.spinningmotion.domain.purchase_history.*;
 import org.myexample.spinningmotion.persistence.PurchaseHistoryRepository;
+import org.myexample.spinningmotion.persistence.RecordRepository;
 import org.myexample.spinningmotion.persistence.entity.PurchaseHistoryEntity;
+import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
     private final PurchaseHistoryRepository purchaseHistoryRepository;
+    private final RecordRepository recordRepository;
 
     @Override
+    @Transactional
     public CreatePurchaseHistoryResponse createPurchaseHistory(CreatePurchaseHistoryRequest request) {
+        // Find the record and check quantity
+        RecordEntity record = recordRepository.findById(request.getRecordId())
+                .orElseThrow(() -> new RecordNotFoundException("Record not found with id: " + request.getRecordId()));
+
+        if (record.getQuantity() < request.getQuantity()) {
+            throw new InsufficientQuantityException("Insufficient quantity available. Requested: "
+                    + request.getQuantity() + ", Available: " + record.getQuantity());
+        }
+
+        // Update record quantity
+        record.setQuantity(record.getQuantity() - request.getQuantity());
+        recordRepository.save(record);
+
         PurchaseHistoryEntity purchaseHistory = PurchaseHistoryEntity.builder()
                 .userId(request.getUserId())
                 .purchaseDate(LocalDateTime.now())
@@ -88,4 +109,69 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
                 .price(entity.getPrice())
                 .build();
     }
+    @Override
+    public AdminDashboardStats getAdminDashboardStats() {
+        return AdminDashboardStats.builder()
+                .totalOrders(countTotalOrders())
+                .totalRevenue(calculateTotalRevenue())
+                .recentOrders(getRecentPurchaseHistories(10))
+                .build();
+    }
+
+    @Override
+    public PurchaseHistoryStats getPurchaseHistoryStats() {
+        return PurchaseHistoryStats.builder()
+                .totalOrders(countTotalOrders())
+                .totalRevenue(calculateTotalRevenue())
+                .purchasesByRecord(getPurchasesByRecord())
+                .averageOrderValue(calculateAverageOrderValue())
+                .build();
+    }
+
+    @Override
+    public List<GetPurchaseHistoryResponse> getRecentPurchaseHistories(int limit) {
+        List<PurchaseHistoryEntity> recentEntities = purchaseHistoryRepository
+                .findTop10ByOrderByPurchaseDateDesc();
+        return recentEntities.stream()
+                .map(this::convertToGetResponse)
+                .toList();
+    }
+
+    @Override
+    public double calculateTotalRevenue() {
+        return purchaseHistoryRepository.findAll().stream()
+                .mapToDouble(PurchaseHistoryEntity::getTotalAmount)
+                .sum();
+    }
+
+    @Override
+    public long countTotalOrders() {
+        return purchaseHistoryRepository.count();
+    }
+
+    @Override
+    public Map<String, Integer> getPurchasesByRecord() {
+        return purchaseHistoryRepository.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        entity -> entity.getRecordId().toString(),
+                        Collectors.summingInt(PurchaseHistoryEntity::getQuantity)
+                ));
+    }
+
+    private double calculateAverageOrderValue() {
+        List<PurchaseHistoryEntity> allOrders = purchaseHistoryRepository.findAll();
+        if (allOrders.isEmpty()) {
+            return 0.0;
+        }
+        double totalRevenue = calculateTotalRevenue();
+        return totalRevenue / allOrders.size();
+    }
+    @Override
+    public List<GetPurchaseHistoryResponse> getAllPurchaseHistories() {
+        List<PurchaseHistoryEntity> entities = purchaseHistoryRepository.findAll();
+        return entities.stream()
+                .map(this::convertToGetResponse)
+                .collect(Collectors.toList());
+    }
+
 }

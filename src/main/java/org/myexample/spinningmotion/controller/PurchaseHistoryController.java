@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/purchase-history")
@@ -41,6 +42,25 @@ public class PurchaseHistoryController {
         purchaseHistoryUseCase.deletePurchaseHistory(id);
         return ResponseEntity.ok("Purchase history deleted");
     }
+
+    @GetMapping("/admin/dashboard")
+    public ResponseEntity<AdminDashboardStats> getAdminDashboardStats() {
+        return ResponseEntity.ok(purchaseHistoryUseCase.getAdminDashboardStats());
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<PurchaseHistoryStats> getPurchaseHistoryStats() {
+        return ResponseEntity.ok(purchaseHistoryUseCase.getPurchaseHistoryStats());
+    }
+
+    @GetMapping("/recent")
+    public ResponseEntity<List<GetPurchaseHistoryResponse>> getRecentPurchaseHistories() {
+        return ResponseEntity.ok(purchaseHistoryUseCase.getRecentPurchaseHistories(10));
+    }
+    @GetMapping("/all")
+    public ResponseEntity<List<GetPurchaseHistoryResponse>> getAllPurchaseHistories() {
+        return ResponseEntity.ok(purchaseHistoryUseCase.getAllPurchaseHistories());
+    }
     //------------------------------------------------------------------------------------------------------------------
     // Exception Handlers for Purchase History
     @ExceptionHandler(PurchaseHistoryNotFoundException.class)
@@ -56,5 +76,9 @@ public class PurchaseHistoryController {
     public ResponseEntity<String> handleGeneralException(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("An error occurred: " + ex.getMessage());
+    }
+    @ExceptionHandler(InsufficientQuantityException.class)
+    public ResponseEntity<String> handleInsufficientQuantity(InsufficientQuantityException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
 }

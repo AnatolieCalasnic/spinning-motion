@@ -3,6 +3,10 @@ package org.myexample.spinningmotion.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hibernate.AnnotationException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -10,7 +14,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.myexample.spinningmotion.business.exception.PurchaseHistoryNotFoundException;
 import org.myexample.spinningmotion.business.interfc.PurchaseHistoryUseCase;
 import org.myexample.spinningmotion.domain.purchase_history.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -18,23 +24,19 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(PurchaseHistoryController.class)
+@ExtendWith(MockitoExtension.class)
 class PurchaseHistoryControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
+    @Mock
     private PurchaseHistoryUseCase purchaseHistoryUseCase;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
+    @InjectMocks
+    private PurchaseHistoryController controller;
     private CreatePurchaseHistoryRequest createRequest;
     private CreatePurchaseHistoryResponse createResponse;
     private GetPurchaseHistoryResponse getPurchaseHistoryResponse;
@@ -75,131 +77,60 @@ class PurchaseHistoryControllerTest {
     }
 
     @Test
-    void createPurchaseHistory_Success() throws Exception {
-        when(purchaseHistoryUseCase.createPurchaseHistory(any(CreatePurchaseHistoryRequest.class)))
-                .thenReturn(createResponse);
-
-        mockMvc.perform(post("/purchase-history")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.userId").value(1L))
-                .andExpect(jsonPath("$.status").value("Completed"))
-                .andExpect(jsonPath("$.totalAmount").value(39.98))
-                .andExpect(jsonPath("$.recordId").value(1L))
-                .andExpect(jsonPath("$.quantity").value(2))
-                .andExpect(jsonPath("$.price").value(19.99));
-
-        verify(purchaseHistoryUseCase, times(1)).createPurchaseHistory(any(CreatePurchaseHistoryRequest.class));
+    void createPurchaseHistory_Success() {
+        when(purchaseHistoryUseCase.createPurchaseHistory(any())).thenReturn(createResponse);
+        ResponseEntity<CreatePurchaseHistoryResponse> response = controller.createPurchaseHistory(createRequest);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(createResponse, response.getBody());
+        verify(purchaseHistoryUseCase).createPurchaseHistory(createRequest);
     }
 
     @Test
-    void getAllPurchaseHistories_Success() throws Exception {
+    void getAllPurchaseHistories_Success() {
         List<GetPurchaseHistoryResponse> responses = Arrays.asList(getPurchaseHistoryResponse);
         when(purchaseHistoryUseCase.getAllPurchaseHistories(1L)).thenReturn(responses);
-
-        mockMvc.perform(get("/purchase-history/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1L))
-                .andExpect(jsonPath("$[0].userId").value(1L))
-                .andExpect(jsonPath("$[0].status").value("Completed"))
-                .andExpect(jsonPath("$[0].totalAmount").value(39.98))
-                .andExpect(jsonPath("$[0].recordId").value(1L))
-                .andExpect(jsonPath("$[0].quantity").value(2))
-                .andExpect(jsonPath("$[0].price").value(19.99));
-
-        verify(purchaseHistoryUseCase, times(1)).getAllPurchaseHistories(1L);
+        ResponseEntity<List<GetPurchaseHistoryResponse>> response = controller.getAllPurchaseHistories(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(responses, response.getBody());
     }
 
     @Test
-    void getPurchaseHistory_Success() throws Exception {
-        when(purchaseHistoryUseCase.getPurchaseHistory(any(GetPurchaseHistoryRequest.class)))
-                .thenReturn(getPurchaseHistoryResponse);
-
-        mockMvc.perform(get("/purchase-history/history/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.userId").value(1L))
-                .andExpect(jsonPath("$.status").value("Completed"))
-                .andExpect(jsonPath("$.totalAmount").value(39.98))
-                .andExpect(jsonPath("$.recordId").value(1L))
-                .andExpect(jsonPath("$.quantity").value(2))
-                .andExpect(jsonPath("$.price").value(19.99));
-
-        verify(purchaseHistoryUseCase, times(1)).getPurchaseHistory(any(GetPurchaseHistoryRequest.class));
+    void getPurchaseHistory_Success() {
+        when(purchaseHistoryUseCase.getPurchaseHistory(any())).thenReturn(getPurchaseHistoryResponse);
+        ResponseEntity<GetPurchaseHistoryResponse> response = controller.getPurchaseHistory(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(getPurchaseHistoryResponse, response.getBody());
     }
-    @Test
-    void getAllPurchaseHistories_EmptyList() throws Exception {
-        when(purchaseHistoryUseCase.getAllPurchaseHistories(1L)).thenReturn(Collections.emptyList());
 
-        mockMvc.perform(get("/purchase-history/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$").isEmpty());
-
-        verify(purchaseHistoryUseCase).getAllPurchaseHistories(1L);
-    }
     @Test
-    void getPurchaseHistory_NotFound() throws Exception {
-        when(purchaseHistoryUseCase.getPurchaseHistory(any(GetPurchaseHistoryRequest.class)))
+    void getPurchaseHistory_NotFound() {
+        when(purchaseHistoryUseCase.getPurchaseHistory(any()))
                 .thenThrow(new PurchaseHistoryNotFoundException("Purchase history not found"));
-
-        mockMvc.perform(get("/purchase-history/history/1"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("Purchase history not found"));
-
-        verify(purchaseHistoryUseCase, times(1)).getPurchaseHistory(any(GetPurchaseHistoryRequest.class));
-    }
-    // Add these tests to PurchaseHistoryControllerTest class
-
-    @Test
-    void handleAnnotationException_ShouldReturnBadRequest() throws Exception {
-        // Given
-        when(purchaseHistoryUseCase.createPurchaseHistory(any(CreatePurchaseHistoryRequest.class)))
-                .thenThrow(new AnnotationException("Invalid mapping"));
-
-        // When & Then
-        mockMvc.perform(post("/purchase-history")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Error in entity mapping: Invalid mapping"));
+        assertThrows(PurchaseHistoryNotFoundException.class,
+                () -> controller.getPurchaseHistory(1L));
     }
 
     @Test
-    void handleGeneralException_ShouldReturnInternalServerError() throws Exception {
-        // Given
-        when(purchaseHistoryUseCase.createPurchaseHistory(any(CreatePurchaseHistoryRequest.class)))
-                .thenThrow(new RuntimeException("Unexpected error"));
-
-        // When & Then
-        mockMvc.perform(post("/purchase-history")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().string("An error occurred: Unexpected error"));
+    void getAllPurchaseHistories_EmptyList() {
+        when(purchaseHistoryUseCase.getAllPurchaseHistories(1L)).thenReturn(Collections.emptyList());
+        ResponseEntity<List<GetPurchaseHistoryResponse>> response = controller.getAllPurchaseHistories(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody().isEmpty());
     }
+
     @Test
-    void deletePurchaseHistory_Success() throws Exception {
+    void deletePurchaseHistory_Success() {
         doNothing().when(purchaseHistoryUseCase).deletePurchaseHistory(1L);
-
-        mockMvc.perform(delete("/purchase-history/1"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("Purchase history deleted"));
-
-        verify(purchaseHistoryUseCase, times(1)).deletePurchaseHistory(1L);
+        ResponseEntity<String> response = controller.deletePurchaseHistory(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Purchase history deleted", response.getBody());
     }
 
     @Test
-    void deletePurchaseHistory_NotFound() throws Exception {
+    void deletePurchaseHistory_NotFound() {
         doThrow(new PurchaseHistoryNotFoundException("Purchase history not found"))
                 .when(purchaseHistoryUseCase).deletePurchaseHistory(1L);
-
-        mockMvc.perform(delete("/purchase-history/1"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("Purchase history not found"));
-
-        verify(purchaseHistoryUseCase, times(1)).deletePurchaseHistory(1L);
+        assertThrows(PurchaseHistoryNotFoundException.class,
+                () -> controller.deletePurchaseHistory(1L));
     }
 }

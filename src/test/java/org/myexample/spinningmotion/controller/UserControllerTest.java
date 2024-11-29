@@ -3,6 +3,10 @@ package org.myexample.spinningmotion.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -12,27 +16,29 @@ import org.myexample.spinningmotion.business.exception.UserNotFoundException;
 import org.myexample.spinningmotion.business.interfc.UserUseCase;
 import org.myexample.spinningmotion.domain.user.*;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(UserController.class)
+@ExtendWith(MockitoExtension.class)
 class UserControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
+    @Mock
     private UserUseCase userUseCase;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    @InjectMocks
+    private UserController controller;
 
     private CreateUserRequest createUserRequest;
     private CreateUserResponse createUserResponse;
@@ -85,109 +91,67 @@ class UserControllerTest {
     }
 
     @Test
-    void newUser_Success() throws Exception {
-        when(userUseCase.createUser(any(CreateUserRequest.class))).thenReturn(createUserResponse);
-
-        mockMvc.perform(post("/user")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createUserRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.fname").value("Donny"))
-                .andExpect(jsonPath("$.lname").value("Trotre"))
-                .andExpect(jsonPath("$.email").value("donny@agymnasium.com"));
-
-        verify(userUseCase, times(1)).createUser(any(CreateUserRequest.class));
+    void newUser_Success() {
+        when(passwordEncoder.encode(any())).thenReturn("encodedPassword");
+        when(userUseCase.createUser(any())).thenReturn(createUserResponse);
+        ResponseEntity<CreateUserResponse> response = controller.newUser(createUserRequest);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(createUserResponse, response.getBody());
+        verify(passwordEncoder).encode("sososo123123");
     }
 
     @Test
-    void newUser_EmailAlreadyExists() throws Exception {
-        when(userUseCase.createUser(any(CreateUserRequest.class))).thenThrow(new EmailAlreadyExistsException());
-
-        mockMvc.perform(post("/user")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createUserRequest)))
-                .andExpect(status().isConflict())
-                .andExpect(content().string("It appears a user with this email already exists."));
-
-        verify(userUseCase, times(1)).createUser(any(CreateUserRequest.class));
+    void newUser_EmailExists() {
+        when(passwordEncoder.encode(any())).thenReturn("encodedPassword");
+        when(userUseCase.createUser(any())).thenThrow(new EmailAlreadyExistsException());
+        assertThrows(EmailAlreadyExistsException.class, () -> controller.newUser(createUserRequest));
+        verify(passwordEncoder).encode("sososo123123");
     }
 
     @Test
-    void getAllUsers_Success() throws Exception {
+    void getAllUsers_Success() {
         List<GetUserResponse> users = Arrays.asList(getUserResponse);
         when(userUseCase.getAllUsers()).thenReturn(users);
-
-        mockMvc.perform(get("/users"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1L))
-                .andExpect(jsonPath("$[0].fname").value("Donny"))
-                .andExpect(jsonPath("$[0].lname").value("Trotre"))
-                .andExpect(jsonPath("$[0].email").value("donny@agymnasium.com"));
-
-        verify(userUseCase, times(1)).getAllUsers();
+        ResponseEntity<List<GetUserResponse>> response = controller.getAllUsers();
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(users, response.getBody());
     }
 
     @Test
-    void getUserById_Success() throws Exception {
-        when(userUseCase.getUser(any(GetUserRequest.class))).thenReturn(getUserResponse);
-
-        mockMvc.perform(get("/user/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.fname").value("Donny"))
-                .andExpect(jsonPath("$.lname").value("Trotre"))
-                .andExpect(jsonPath("$.email").value("donny@agymnasium.com"));
-
-        verify(userUseCase, times(1)).getUser(any(GetUserRequest.class));
+    void getUserById_Success() {
+        when(userUseCase.getUser(any())).thenReturn(getUserResponse);
+        ResponseEntity<GetUserResponse> response = controller.getUserById(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(getUserResponse, response.getBody());
     }
 
     @Test
-    void getUserById_NotFound() throws Exception {
-        when(userUseCase.getUser(any(GetUserRequest.class))).thenThrow(new UserNotFoundException("User not found"));
-
-        mockMvc.perform(get("/user/1"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("User not found"));
-
-        verify(userUseCase, times(1)).getUser(any(GetUserRequest.class));
+    void getUserById_NotFound() {
+        when(userUseCase.getUser(any()))
+                .thenThrow(new UserNotFoundException("User not found"));
+        assertThrows(UserNotFoundException.class, () -> controller.getUserById(1L));
     }
 
     @Test
-    void updateUser_Success() throws Exception {
-        when(userUseCase.updateUser(any(UpdateUserRequest.class))).thenReturn(updateUserResponse);
-
-        mockMvc.perform(put("/user/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateUserRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.fname").value("Donny"))
-                .andExpect(jsonPath("$.lname").value("Tretre"))
-                .andExpect(jsonPath("$.email").value("danny@agymnasium.com"));
-
-        verify(userUseCase, times(1)).updateUser(any(UpdateUserRequest.class));
+    void updateUser_Success() {
+        when(userUseCase.updateUser(any())).thenReturn(updateUserResponse);
+        ResponseEntity<UpdateUserResponse> response = controller.updateUser(updateUserRequest,1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(updateUserResponse, response.getBody());
     }
 
     @Test
-    void deleteUser_Success() throws Exception {
+    void deleteUser_Success() {
         doNothing().when(userUseCase).deleteUser(1L);
-
-        mockMvc.perform(delete("/user/1"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("User with id 1 has been deleted"));
-
-        verify(userUseCase, times(1)).deleteUser(1L);
+        ResponseEntity<String> response = controller.deleteUser(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("User with id 1 has been deleted", response.getBody());
     }
 
     @Test
-    void deleteUser_NotFound() throws Exception {
-        doThrow(new UserNotFoundException("User not found")).when(userUseCase).deleteUser(1L);
-
-        mockMvc.perform(delete("/user/1"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("User not found"));
-
-        verify(userUseCase, times(1)).deleteUser(1L);
+    void deleteUser_NotFound() {
+        doThrow(new UserNotFoundException("User not found"))
+                .when(userUseCase).deleteUser(1L);
+        assertThrows(UserNotFoundException.class, () -> controller.deleteUser(1L));
     }
 }

@@ -1,16 +1,15 @@
-package org.myexample.spinningmotion.domain.genre;
+package org.myexample.spinningmotion.domain.login;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Genre {
-    private Long id;
-    private String name;
+public class LoginRequest {
+    private String email;
+    private String password;
 }

@@ -35,11 +35,17 @@ dependencies {
     implementation("org.flywaydb:flyway-mysql")
     implementation("com.mysql:mysql-connector-j:8.2.0")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation ("org.springframework.boot:spring-boot-starter-security")
+    implementation ("io.jsonwebtoken:jjwt-api:0.11.5")
+    runtimeOnly ("io.jsonwebtoken:jjwt-impl:0.11.5")
+    runtimeOnly ("io.jsonwebtoken:jjwt-jackson:0.11.5")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation ("org.springframework.security:spring-security-test")
     testRuntimeOnly("com.h2database:h2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
 }
 
 sonar {
