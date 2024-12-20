@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.myexample.spinningmotion.business.exception.EmailAlreadyExistsException;
 import org.myexample.spinningmotion.business.exception.InvalidInputException;
 import org.myexample.spinningmotion.business.exception.UserNotFoundException;
+import org.myexample.spinningmotion.business.impl.notification.NotificationUseCaseImpl;
 import org.myexample.spinningmotion.business.interfc.UserUseCase;
 import org.myexample.spinningmotion.domain.user.*;
 import org.springframework.http.HttpStatus;
@@ -21,11 +22,16 @@ public class UserController {
 
     private final UserUseCase userUseCase;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationUseCaseImpl notificationUseCase;
 
     @PostMapping("/user")
     public ResponseEntity<CreateUserResponse> newUser(@Valid @RequestBody CreateUserRequest request) {
         request.setPassword(passwordEncoder.encode(request.getPassword()));
         CreateUserResponse response = userUseCase.createUser(request);
+        notificationUseCase.sendAuthenticationNotification(
+                "New user registered: " + response.getEmail(),
+                "SUCCESS"
+        );
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 

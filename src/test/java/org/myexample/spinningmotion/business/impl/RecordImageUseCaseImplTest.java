@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.myexample.spinningmotion.business.impl.record.RecordImageUseCaseImpl;
 import org.myexample.spinningmotion.persistence.RecordImageRepository;
 import org.myexample.spinningmotion.persistence.RecordRepository;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;

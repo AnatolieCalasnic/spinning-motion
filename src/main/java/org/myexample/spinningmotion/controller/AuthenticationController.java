@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.myexample.spinningmotion.business.impl.notification.NotificationUseCaseImpl;
 import org.myexample.spinningmotion.business.interfc.LoginUseCase;
 import org.myexample.spinningmotion.configuration.security.jwt.JwtUtils;
 import org.myexample.spinningmotion.domain.login.LoginRequest;
@@ -26,6 +27,7 @@ public class AuthenticationController {
     private final LoginUseCase loginUseCase;
     private final JwtUtils jwtUtils;
     private final UserRepository userRepository;
+    private final NotificationUseCaseImpl notificationUseCase;
 
     @Value("${jwt.cookie.name}")
     private String cookieName;
@@ -49,6 +51,10 @@ public class AuthenticationController {
             cookie.setAttribute("SameSite", "Lax");
             response.addCookie(cookie);
 
+            notificationUseCase.sendAuthenticationNotification(
+                    "User logged in: " + authenticatedUser.getEmail(),
+                    "SUCCESS"
+            );
             // Return user info without the token
             return ResponseEntity.ok(LoginResponse.builder()
                     .userId(authenticatedUser.getId())
@@ -60,7 +66,17 @@ public class AuthenticationController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletResponse response) {
+    public ResponseEntity<Void> logout(HttpServletResponse response, HttpServletRequest request) {
+
+        String token = jwtUtils.getJwtFromCookies(request);
+        if (token != null && jwtUtils.validateJwtToken(token)) {
+            String email = jwtUtils.getEmailFromJwtToken(token);
+            notificationUseCase.sendAuthenticationNotification(
+                    "User logged out: " + email,
+                    "INFO"
+            );
+        }
+
         Cookie cookie = new Cookie(cookieName, "");
         cookie.setHttpOnly(true);
         cookie.setSecure(true);

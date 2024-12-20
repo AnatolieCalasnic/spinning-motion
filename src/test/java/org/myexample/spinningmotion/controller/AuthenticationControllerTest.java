@@ -3,6 +3,7 @@ package org.myexample.spinningmotion.controller;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.myexample.spinningmotion.business.impl.notification.NotificationUseCaseImpl;
 import org.myexample.spinningmotion.business.interfc.LoginUseCase;
 import org.myexample.spinningmotion.configuration.security.jwt.JwtUtils;
 import org.myexample.spinningmotion.domain.login.LoginRequest;
@@ -37,6 +38,8 @@ class AuthenticationControllerTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private NotificationUseCaseImpl notificationUseCase;
     @Mock
     private HttpServletRequest httpServletRequest;
     @Mock
@@ -99,6 +102,11 @@ class AuthenticationControllerTest {
         assertEquals("/", cookie.getPath());
         assertEquals(86400, cookie.getMaxAge());
         assertEquals("Lax", cookie.getAttribute("SameSite"));
+
+        verify(notificationUseCase).sendAuthenticationNotification(
+                "User logged in: test@example.com",
+                "SUCCESS"
+        );
     }
 
     @Test
@@ -117,12 +125,70 @@ class AuthenticationControllerTest {
         // Verify no cookie was set
         verify(httpServletResponse, never()).addCookie(any(Cookie.class));
         verify(jwtUtils, never()).generateToken(any());
+        verify(notificationUseCase, never()).sendAuthenticationNotification(any(), any());
+    }
+    @Test
+    void logout_WithValidToken_ClearsTokenCookieAndSendsNotification() {
+        // Arrange
+        String validToken = "valid.jwt.token";
+        when(jwtUtils.getJwtFromCookies(httpServletRequest)).thenReturn(validToken);
+        when(jwtUtils.validateJwtToken(validToken)).thenReturn(true);
+        when(jwtUtils.getEmailFromJwtToken(validToken)).thenReturn("test@example.com");
+
+        // Act
+        ResponseEntity<Void> response = authController.logout(httpServletResponse, httpServletRequest);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+
+        // Verify cookie settings
+        verify(httpServletResponse).addCookie(cookieCaptor.capture());
+        Cookie cookie = cookieCaptor.getValue();
+        assertEquals(TEST_COOKIE_NAME, cookie.getName());
+        assertEquals("", cookie.getValue());
+        assertTrue(cookie.isHttpOnly());
+        assertTrue(cookie.getSecure());
+        assertEquals("/", cookie.getPath());
+        assertEquals(0, cookie.getMaxAge());
+        assertEquals("Lax", cookie.getAttribute("SameSite"));
+
+        // Verify notification was sent
+        verify(notificationUseCase).sendAuthenticationNotification(
+                "User logged out: test@example.com",
+                "INFO"
+        );
     }
 
     @Test
+    void logout_WithInvalidToken_ClearsTokenCookieWithoutNotification() {
+        // Arrange
+        when(jwtUtils.getJwtFromCookies(httpServletRequest)).thenReturn("invalid.token");
+        when(jwtUtils.validateJwtToken("invalid.token")).thenReturn(false);
+
+        // Act
+        ResponseEntity<Void> response = authController.logout(httpServletResponse, httpServletRequest);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+
+        // Verify cookie settings
+        verify(httpServletResponse).addCookie(cookieCaptor.capture());
+        Cookie cookie = cookieCaptor.getValue();
+        assertEquals(TEST_COOKIE_NAME, cookie.getName());
+        assertEquals("", cookie.getValue());
+        assertTrue(cookie.isHttpOnly());
+        assertTrue(cookie.getSecure());
+        assertEquals("/", cookie.getPath());
+        assertEquals(0, cookie.getMaxAge());
+        assertEquals("Lax", cookie.getAttribute("SameSite"));
+
+        // Verify no notification was sent
+        verify(notificationUseCase, never()).sendAuthenticationNotification(any(), any());
+    }
+    @Test
     void logout_ClearsTokenCookie() {
         // Act
-        ResponseEntity<Void> response = authController.logout(httpServletResponse);
+        ResponseEntity<Void> response = authController.logout(httpServletResponse, httpServletRequest);
 
         // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -171,6 +237,10 @@ class AuthenticationControllerTest {
 
         // Verify cookie was set
         verify(httpServletResponse).addCookie(any(Cookie.class));
+        verify(notificationUseCase).sendAuthenticationNotification(
+                "User logged in: admin@example.com",
+                "SUCCESS"
+        );
     }
 
     @Test
@@ -189,6 +259,8 @@ class AuthenticationControllerTest {
         // Verify no cookie was set
         verify(httpServletResponse, never()).addCookie(any(Cookie.class));
         verify(jwtUtils, never()).generateToken(any());
+        verify(notificationUseCase, never()).sendAuthenticationNotification(any(), any());
+
     }
     @Test
     void validateToken_ValidToken_ReturnsLoginResponse() {

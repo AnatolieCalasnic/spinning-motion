@@ -1,4 +1,4 @@
-package org.myexample.spinningmotion.business.impl;
+package org.myexample.spinningmotion.business.impl.review;
 
 import lombok.RequiredArgsConstructor;
 import org.myexample.spinningmotion.business.exception.DuplicateReviewException;

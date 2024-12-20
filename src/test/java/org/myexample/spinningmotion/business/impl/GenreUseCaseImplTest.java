@@ -7,6 +7,7 @@ import org.mockito.InjectMocks;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.myexample.spinningmotion.business.exception.GenreNotFoundException;
+import org.myexample.spinningmotion.business.impl.genre.GenreUseCaseImpl;
 import org.myexample.spinningmotion.domain.enums.GenreEnum;
 import org.myexample.spinningmotion.domain.genre.*;
 import org.myexample.spinningmotion.persistence.GenreRepository;

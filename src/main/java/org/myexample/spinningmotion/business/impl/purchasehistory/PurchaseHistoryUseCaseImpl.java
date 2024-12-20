@@ -1,4 +1,4 @@
-package org.myexample.spinningmotion.business.impl;
+package org.myexample.spinningmotion.business.impl.purchasehistory;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +21,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
+    private static final String PURCHASE_HISTORY_NOT_FOUND = "Purchase history not found with id: ";
+
     private final PurchaseHistoryRepository purchaseHistoryRepository;
     private final RecordRepository recordRepository;
 
@@ -42,6 +44,7 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
 
         PurchaseHistoryEntity purchaseHistory = PurchaseHistoryEntity.builder()
                 .userId(request.getUserId())
+                .isGuest(request.isGuest())
                 .purchaseDate(LocalDateTime.now())
                 .status("COMPLETED")
                 .totalAmount(request.getTotalAmount())
@@ -66,21 +69,23 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
 
     @Override
     public GetPurchaseHistoryResponse getPurchaseHistory(GetPurchaseHistoryRequest request) {
-        PurchaseHistoryEntity entity = purchaseHistoryRepository.findById(request.getId())
-                .orElseThrow(() -> new PurchaseHistoryNotFoundException("Purchase history not found with id: " + request.getId()));
+        PurchaseHistoryEntity referenceOrder = purchaseHistoryRepository.findById(request.getId())
+                .orElseThrow(() -> new PurchaseHistoryNotFoundException(PURCHASE_HISTORY_NOT_FOUND  + request.getId()));
 
-        return GetPurchaseHistoryResponse.builder()
-                .id(entity.getId())
-                .userId(entity.getUserId())
-                .purchaseDate(entity.getPurchaseDate())
-                .status(entity.getStatus())
-                .totalAmount(entity.getTotalAmount())
-                .recordId(entity.getRecordId())
-                .quantity(entity.getQuantity())
-                .price(entity.getPrice())
-                .build();
+        // Converting the reference order to response
+        return convertToGetResponse(referenceOrder);
     }
+    @Override
+    public List<GetPurchaseHistoryResponse> getRelatedOrders(Long orderId) {
+        PurchaseHistoryEntity referenceOrder = purchaseHistoryRepository.findById(orderId)
+                .orElseThrow(() -> new PurchaseHistoryNotFoundException(PURCHASE_HISTORY_NOT_FOUND + orderId));
 
+        return purchaseHistoryRepository
+                .findAllByUserIdAndPurchaseDate(referenceOrder.getUserId(), referenceOrder.getPurchaseDate())
+                .stream()
+                .map(this::convertToGetResponse)
+                .toList();
+    }
     @Override
     public List<GetPurchaseHistoryResponse> getAllPurchaseHistories(Long userId) {
         List<PurchaseHistoryEntity> entities = purchaseHistoryRepository.findAllByUserId(userId);
@@ -92,7 +97,7 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
     @Override
     public void deletePurchaseHistory(Long id) {
         if (!purchaseHistoryRepository.findById(id).isPresent()) {
-            throw new PurchaseHistoryNotFoundException("Purchase history not found with id: " + id);
+            throw new PurchaseHistoryNotFoundException(PURCHASE_HISTORY_NOT_FOUND + id);
         }
         purchaseHistoryRepository.deleteById(id);
     }

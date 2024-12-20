@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/purchase-history")
@@ -60,6 +59,10 @@ public class PurchaseHistoryController {
     @GetMapping("/all")
     public ResponseEntity<List<GetPurchaseHistoryResponse>> getAllPurchaseHistories() {
         return ResponseEntity.ok(purchaseHistoryUseCase.getAllPurchaseHistories());
+    }
+    @GetMapping("/related/{id}")
+    public ResponseEntity<List<GetPurchaseHistoryResponse>> getRelatedOrders(@PathVariable Long id) {
+        return ResponseEntity.ok(purchaseHistoryUseCase.getRelatedOrders(id));
     }
     //------------------------------------------------------------------------------------------------------------------
     // Exception Handlers for Purchase History

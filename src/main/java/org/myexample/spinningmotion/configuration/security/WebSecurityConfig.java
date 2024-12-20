@@ -41,7 +41,13 @@ public class WebSecurityConfig {
                                 .requestMatchers("/genres/**").permitAll()
                                 .requestMatchers("/purchase-history/**").permitAll()
                                 .requestMatchers("/records/**").permitAll()
+                                .requestMatchers("/search/**").permitAll()
+                                .requestMatchers("/api/payment/**").permitAll()
+                                .requestMatchers("/guest-orders/**").permitAll()
                                 .requestMatchers("/error").permitAll()
+                                .requestMatchers("/ws/**").permitAll()
+                                .requestMatchers("/topic/**").permitAll()
+                                .requestMatchers("/app/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .exceptionHandling(configure -> configure.authenticationEntryPoint(authenticationEntryPoint))
@@ -54,7 +60,7 @@ public class WebSecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With","Origin","Stripe-Signature"));
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true); // cookies
 

@@ -1,4 +1,4 @@
-package org.myexample.spinningmotion.business.impl;
+package org.myexample.spinningmotion.business.impl.record;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;

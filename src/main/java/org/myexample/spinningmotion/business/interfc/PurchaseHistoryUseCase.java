@@ -1,6 +1,7 @@
 package org.myexample.spinningmotion.business.interfc;
 import org.myexample.spinningmotion.domain.purchase_history.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -16,4 +17,6 @@ public interface PurchaseHistoryUseCase {
     long countTotalOrders();
     Map<String, Integer> getPurchasesByRecord();
     List<GetPurchaseHistoryResponse> getAllPurchaseHistories();
+    List<GetPurchaseHistoryResponse> getRelatedOrders(Long orderId);
+
 }

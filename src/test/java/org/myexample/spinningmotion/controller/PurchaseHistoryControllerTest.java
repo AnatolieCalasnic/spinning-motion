@@ -40,11 +40,11 @@ class PurchaseHistoryControllerTest {
     private CreatePurchaseHistoryRequest createRequest;
     private CreatePurchaseHistoryResponse createResponse;
     private GetPurchaseHistoryResponse getPurchaseHistoryResponse;
+    private AdminDashboardStats adminDashboardStats;
+    private PurchaseHistoryStats purchaseHistoryStats;
 
     @BeforeEach
     void setUp() {
-
-
         createRequest = CreatePurchaseHistoryRequest.builder()
                 .userId(1L)
                 .recordId(1L)
@@ -74,6 +74,18 @@ class PurchaseHistoryControllerTest {
                 .quantity(2)
                 .price(19.99)
                 .build();
+        adminDashboardStats = AdminDashboardStats.builder()
+                .totalOrders(5L)
+                .totalRevenue(500.0)
+                .recentOrders(Collections.singletonList(getPurchaseHistoryResponse))
+                .build();
+
+        purchaseHistoryStats = PurchaseHistoryStats.builder()
+                .totalOrders(5L)
+                .totalRevenue(500.0)
+                .averageOrderValue(100.0)
+                .purchasesByRecord(Collections.singletonMap("1", 10))
+                .build();
     }
 
     @Test
@@ -84,7 +96,16 @@ class PurchaseHistoryControllerTest {
         assertEquals(createResponse, response.getBody());
         verify(purchaseHistoryUseCase).createPurchaseHistory(createRequest);
     }
+    @Test
+    void getAllPurchaseHistories_ByUserId_Success() {
+        List<GetPurchaseHistoryResponse> responses = Arrays.asList(getPurchaseHistoryResponse);
+        when(purchaseHistoryUseCase.getAllPurchaseHistories(1L)).thenReturn(responses);
 
+        ResponseEntity<List<GetPurchaseHistoryResponse>> response = controller.getAllPurchaseHistories(1L);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(responses, response.getBody());
+    }
     @Test
     void getAllPurchaseHistories_Success() {
         List<GetPurchaseHistoryResponse> responses = Arrays.asList(getPurchaseHistoryResponse);
@@ -109,7 +130,16 @@ class PurchaseHistoryControllerTest {
         assertThrows(PurchaseHistoryNotFoundException.class,
                 () -> controller.getPurchaseHistory(1L));
     }
+    @Test
+    void getRelatedOrders_Success() {
+        List<GetPurchaseHistoryResponse> responses = Arrays.asList(getPurchaseHistoryResponse);
+        when(purchaseHistoryUseCase.getRelatedOrders(1L)).thenReturn(responses);
 
+        ResponseEntity<List<GetPurchaseHistoryResponse>> response = controller.getRelatedOrders(1L);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(responses, response.getBody());
+    }
     @Test
     void getAllPurchaseHistories_EmptyList() {
         when(purchaseHistoryUseCase.getAllPurchaseHistories(1L)).thenReturn(Collections.emptyList());
@@ -132,5 +162,35 @@ class PurchaseHistoryControllerTest {
                 .when(purchaseHistoryUseCase).deletePurchaseHistory(1L);
         assertThrows(PurchaseHistoryNotFoundException.class,
                 () -> controller.deletePurchaseHistory(1L));
+    }
+    @Test
+    void getAdminDashboardStats_Success() {
+        when(purchaseHistoryUseCase.getAdminDashboardStats()).thenReturn(adminDashboardStats);
+
+        ResponseEntity<AdminDashboardStats> response = controller.getAdminDashboardStats();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(adminDashboardStats, response.getBody());
+    }
+
+    @Test
+    void getPurchaseHistoryStats_Success() {
+        when(purchaseHistoryUseCase.getPurchaseHistoryStats()).thenReturn(purchaseHistoryStats);
+
+        ResponseEntity<PurchaseHistoryStats> response = controller.getPurchaseHistoryStats();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(purchaseHistoryStats, response.getBody());
+    }
+
+    @Test
+    void getRecentPurchaseHistories_Success() {
+        List<GetPurchaseHistoryResponse> responses = Arrays.asList(getPurchaseHistoryResponse);
+        when(purchaseHistoryUseCase.getRecentPurchaseHistories(10)).thenReturn(responses);
+
+        ResponseEntity<List<GetPurchaseHistoryResponse>> response = controller.getRecentPurchaseHistories();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(responses, response.getBody());
     }
 }

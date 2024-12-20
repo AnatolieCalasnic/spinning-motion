@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.myexample.spinningmotion.business.exception.PurchaseHistoryNotFoundException;
+import org.myexample.spinningmotion.business.impl.purchasehistory.PurchaseHistoryUseCaseImpl;
 import org.myexample.spinningmotion.domain.purchase_history.*;
 import org.myexample.spinningmotion.persistence.PurchaseHistoryRepository;
 import org.myexample.spinningmotion.persistence.RecordRepository;

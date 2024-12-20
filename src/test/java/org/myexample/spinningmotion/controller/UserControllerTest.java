@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.myexample.spinningmotion.business.impl.notification.NotificationUseCaseImpl;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -37,6 +38,9 @@ class UserControllerTest {
     private UserUseCase userUseCase;
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private NotificationUseCaseImpl notificationUseCase;
     @InjectMocks
     private UserController controller;
 
@@ -94,10 +98,16 @@ class UserControllerTest {
     void newUser_Success() {
         when(passwordEncoder.encode(any())).thenReturn("encodedPassword");
         when(userUseCase.createUser(any())).thenReturn(createUserResponse);
+        doNothing().when(notificationUseCase).sendAuthenticationNotification(any(), any());
+
         ResponseEntity<CreateUserResponse> response = controller.newUser(createUserRequest);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(createUserResponse, response.getBody());
         verify(passwordEncoder).encode("sososo123123");
+        verify(notificationUseCase).sendAuthenticationNotification(
+                "New user registered: donny@agymnasium.com",
+                "SUCCESS"
+        );
     }
 
     @Test

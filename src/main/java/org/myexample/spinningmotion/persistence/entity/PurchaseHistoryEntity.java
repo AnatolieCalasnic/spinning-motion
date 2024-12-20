@@ -21,7 +21,9 @@ public class PurchaseHistoryEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull
+    @Column(name = "is_guest")
+    private boolean isGuest;
+
     @Column(name = "user_id")
     private Long userId;
 
