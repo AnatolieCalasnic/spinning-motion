@@ -2,6 +2,7 @@ package org.myexample.spinningmotion.business.impl;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.myexample.spinningmotion.business.impl.basket.BasketUseCaseImpl;
 import org.myexample.spinningmotion.persistence.entity.BasketEntity;
 import org.mockito.Mock;
 import org.mockito.InjectMocks;

@@ -1,5 +1,4 @@
-package org.myexample.spinningmotion.business.impl;
-
+package org.myexample.spinningmotion.business.impl.user;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.InjectMocks;

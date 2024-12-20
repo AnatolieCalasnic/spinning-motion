@@ -1,4 +1,4 @@
-package org.myexample.spinningmotion.business.impl;
+package org.myexample.spinningmotion.business.impl.basket;
 
 import lombok.RequiredArgsConstructor;
 import org.myexample.spinningmotion.business.exception.*;
@@ -46,23 +46,30 @@ public class BasketUseCaseImpl implements BasketUseCase {
 
         RecordEntity record = recordRepository.findById(request.getRecordId())
                 .orElseThrow(() -> new RecordNotFoundException("Record not found with id: " + request.getRecordId()));
-
-        if (record.getQuantity() < request.getQuantity()) {
-            throw new OutOfStockException(record.getTitle(), request.getQuantity(), record.getQuantity());
-        }
-
-        BasketItemEntity basketItem = basket.getItems().stream()
+        BasketItemEntity existingItem = basket.getItems().stream()
                 .filter(item -> item.getRecordId().equals(request.getRecordId()))
                 .findFirst()
-                .orElseGet(() -> {
-                    BasketItemEntity newItem = new BasketItemEntity();
-                    newItem.setRecordId(request.getRecordId());
-                    newItem.setQuantity(0);
-                    basket.getItems().add(newItem);
-                    return newItem;
-                });
+                .orElse(null);
 
-        basketItem.setQuantity(basketItem.getQuantity() + request.getQuantity());
+        // Calculate total requested quantity (existing + new)
+        int totalRequestedQuantity = (existingItem != null ? existingItem.getQuantity() : 0) + request.getQuantity();
+
+        // Check if enough stock is available
+        if (record.getQuantity() < totalRequestedQuantity) {
+            throw new OutOfStockException(record.getTitle(), totalRequestedQuantity, record.getQuantity());
+        }
+
+        if (existingItem != null) {
+            // Update existing item quantity
+            existingItem.setQuantity(totalRequestedQuantity);
+        } else {
+            // Create new basket item
+            BasketItemEntity newItem = new BasketItemEntity();
+            newItem.setRecordId(request.getRecordId());
+            newItem.setQuantity(request.getQuantity());
+            basket.getItems().add(newItem);
+        }
+
         basketRepository.save(basket);
 
         // updating the record's quantity

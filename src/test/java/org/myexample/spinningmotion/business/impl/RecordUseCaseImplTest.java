@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.myexample.spinningmotion.business.exception.InvalidInputException;
 import org.myexample.spinningmotion.business.exception.RecordNotFoundException;
+import org.myexample.spinningmotion.business.impl.record.RecordUseCaseImpl;
 import org.myexample.spinningmotion.domain.record.*;
 import org.myexample.spinningmotion.persistence.GenreRepository;
 import org.myexample.spinningmotion.persistence.RecordRepository;

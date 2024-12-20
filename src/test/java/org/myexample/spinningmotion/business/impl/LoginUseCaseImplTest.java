@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.myexample.spinningmotion.business.impl.login.LoginUseCaseImpl;
 import org.myexample.spinningmotion.persistence.UserRepository;
 import org.myexample.spinningmotion.persistence.entity.UserEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
