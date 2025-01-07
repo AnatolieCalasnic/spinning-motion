@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,4 +21,6 @@ public class Record {
     private Integer year;
     private String condition;
     private Integer quantity;
+    private List<RecordImage> images;
+    private LocalDateTime createdAt;
 }

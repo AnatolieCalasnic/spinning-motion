@@ -72,7 +72,11 @@ dependencies {
     implementation("org.webjars:sockjs-client:$sockjsVersion")
     implementation("org.webjars:stomp-websocket:$stompWebSocketVersion")
 
-    // Lombok
+    //Email
+    implementation("org.springframework.boot:spring-boot-starter-mail")
+    implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+    implementation("org.thymeleaf:thymeleaf-spring6")
+
     compileOnly("org.projectlombok:lombok:$lombokVersion")
     annotationProcessor("org.projectlombok:lombok:$lombokVersion")
 
@@ -90,6 +94,27 @@ sonar {
         property("sonar.host.url", project.findProperty("sonarHostUrl")?.toString() ?: "")
         property("sonar.token", project.findProperty("sonarToken")?.toString() ?: "")
         property("sonar.qualitygate.wait", "true")
+        property("sonar.exclusions", listOf(
+            "**/domain/**",
+            "**/controller/**",
+            "**/persistence/**",
+            "**/configuration/**",
+            "**/SpinningMotionApplication.*"
+        ))
+
+        // Excluding domain layer and include only business layer
+        property("sonar.coverage.exclusions", listOf(
+            "**/domain/**",
+            "**/configuration/**",
+            "**/controller/**",
+            "**/persistence/**",
+            "**/SpinningMotionApplication.*"
+        ))
+
+        property("sonar.coverage.inclusions", listOf(
+            "**/business/**"
+        ))
+        property("sonar.coverage.jacoco.xmlReportPaths", "$rootDir/build/reports/jacoco/test/jacocoTestReport.xml")
     }
 }
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
@@ -101,11 +126,31 @@ tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     ))
 }
 tasks.jacocoTestReport {
+    dependsOn(tasks.test) // Tests are required before generating report
     reports {
         xml.required.set(true)
+        csv.required.set(false)
+        html.required.set(true)
     }
+    classDirectories.setFrom(files(classDirectories.files.map { file ->
+        fileTree(file) {
+            exclude(
+                "**/domain/**",
+                "**/configuration/**",
+                "**/controller/**",
+                "**/persistence/**",
+                "**/SpinningMotionApplication.*"
+            )
+            include(
+                "**/business/**"
+            )
+        }
+    }))
 }
-tasks.withType<Test> {
+tasks.test {
     useJUnitPlatform()
-    finalizedBy(tasks.named("jacocoTestReport"))
+    finalizedBy(tasks.jacocoTestReport)
+}
+tasks.sonar {
+    dependsOn(tasks.jacocoTestReport)
 }

@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,4 +21,5 @@ public class CreateRecordResponse {
     private Integer year;
     private String condition;
     private Integer quantity;
+    private LocalDateTime createdAt;
 }

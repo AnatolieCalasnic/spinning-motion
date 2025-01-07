@@ -6,6 +6,7 @@ import org.myexample.spinningmotion.business.exception.EmailAlreadyExistsExcepti
 import org.myexample.spinningmotion.business.exception.InvalidInputException;
 import org.myexample.spinningmotion.business.exception.UserNotFoundException;
 import org.myexample.spinningmotion.business.impl.notification.NotificationUseCaseImpl;
+import org.myexample.spinningmotion.business.impl.user.UserTrackingUseCaseImpl;
 import org.myexample.spinningmotion.business.interfc.UserUseCase;
 import org.myexample.spinningmotion.domain.user.*;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ public class UserController {
     private final UserUseCase userUseCase;
     private final PasswordEncoder passwordEncoder;
     private final NotificationUseCaseImpl notificationUseCase;
+    private final UserTrackingUseCaseImpl userTrackingUseCaseImpl;
 
     @PostMapping("/user")
     public ResponseEntity<CreateUserResponse> newUser(@Valid @RequestBody CreateUserRequest request) {
@@ -59,6 +61,10 @@ public class UserController {
     public ResponseEntity<String> deleteUser(@PathVariable Long id) {
         userUseCase.deleteUser(id);
         return ResponseEntity.ok("User with id " + id + " has been deleted");
+    }
+    @GetMapping("/active-users")
+    public ResponseEntity<Integer> getActiveUsersCount() {
+        return ResponseEntity.ok(userTrackingUseCaseImpl.getActiveUsersCount());
     }
     //------------------------------------------------------------------------------------------------------------------
     // Exception Handlers for User

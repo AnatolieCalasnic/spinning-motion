@@ -15,10 +15,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,6 +42,7 @@ class RecordImageUseCaseImplTest {
         recordEntity = RecordEntity.builder()
                 .id(1L)
                 .title("Test Record")
+                .images(new ArrayList<>())
                 .build();
 
         imageEntity = RecordImageEntity.builder()
@@ -53,6 +51,7 @@ class RecordImageUseCaseImplTest {
                 .imageData("test-image".getBytes())
                 .imageType("image/jpeg")
                 .build();
+        recordEntity.getImages().add(imageEntity);
 
         multipartFile = new MockMultipartFile(
                 "image",
@@ -155,23 +154,25 @@ class RecordImageUseCaseImplTest {
 
     @Test
     void deleteImage_Success() {
-        when(recordImageRepository.existsById(1L)).thenReturn(true);
+        when(recordImageRepository.findById(1L)).thenReturn(Optional.of(imageEntity));
+        when(recordRepository.save(any(RecordEntity.class))).thenReturn(recordEntity);
 
         assertDoesNotThrow(() -> recordImageUseCase.deleteImage(1L));
 
-        verify(recordImageRepository).existsById(1L);
+        verify(recordImageRepository).findById(1L);
         verify(recordImageRepository).deleteById(1L);
+        verify(recordRepository).save(any(RecordEntity.class));
     }
 
     @Test
     void deleteImage_NotFound() {
-        when(recordImageRepository.existsById(1L)).thenReturn(false);
+        when(recordImageRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () ->
                 recordImageUseCase.deleteImage(1L)
         );
 
-        verify(recordImageRepository).existsById(1L);
+        verify(recordImageRepository).findById(1L);
         verify(recordImageRepository, never()).deleteById(any());
     }
 
@@ -179,5 +180,110 @@ class RecordImageUseCaseImplTest {
     void deleteAllImagesForRecord_Success() {
         assertDoesNotThrow(() -> recordImageUseCase.deleteAllImagesForRecord(1L));
         verify(recordImageRepository).deleteByRecordId(1L);
+    }
+    @Test
+    void uploadMultipleImages_Success() {
+        // Arrange
+        List<MultipartFile> files = Arrays.asList(
+                new MockMultipartFile("image1", "test1.jpg", "image/jpeg", "test-image-1".getBytes()),
+                new MockMultipartFile("image2", "test2.jpg", "image/jpeg", "test-image-2".getBytes())
+        );
+
+        when(recordRepository.findById(1L)).thenReturn(Optional.of(recordEntity));
+        when(recordImageRepository.findByRecordId(1L)).thenReturn(Collections.emptyList());
+        when(recordImageRepository.save(any(RecordImageEntity.class))).thenReturn(imageEntity);
+        when(recordRepository.save(any(RecordEntity.class))).thenReturn(recordEntity);
+
+        // Act
+        List<RecordImageEntity> result = recordImageUseCase.uploadMultipleImages(1L, files);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        verify(recordRepository).findById(1L);
+        verify(recordImageRepository).findByRecordId(1L);
+        verify(recordImageRepository, times(2)).save(any(RecordImageEntity.class));
+        verify(recordRepository).save(recordEntity);
+    }
+
+    @Test
+    void uploadMultipleImages_RecordNotFound() {
+        // Arrange
+        List<MultipartFile> files = Collections.singletonList(multipartFile);
+        when(recordRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () ->
+                recordImageUseCase.uploadMultipleImages(1L, files)
+        );
+
+        verify(recordRepository).findById(1L);
+        verify(recordImageRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadMultipleImages_ExceedsMaxImages() {
+        // Arrange
+        List<MultipartFile> files = Arrays.asList(
+                new MockMultipartFile("image1", "test1.jpg", "image/jpeg", "test-image-1".getBytes()),
+                new MockMultipartFile("image2", "test2.jpg", "image/jpeg", "test-image-2".getBytes())
+        );
+
+        List<RecordImageEntity> existingImages = new ArrayList<>();
+        for (int i = 0; i < 4; i++) { // Assuming MAX_IMAGES is 5
+            existingImages.add(imageEntity);
+        }
+
+        when(recordRepository.findById(1L)).thenReturn(Optional.of(recordEntity));
+        when(recordImageRepository.findByRecordId(1L)).thenReturn(existingImages);
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () ->
+                recordImageUseCase.uploadMultipleImages(1L, files)
+        );
+
+        verify(recordRepository).findById(1L);
+        verify(recordImageRepository).findByRecordId(1L);
+        verify(recordImageRepository, never()).save(any());
+    }
+
+    @Test
+    void validateImage_EmptyFile() {
+        // Arrange
+        MultipartFile emptyFile = new MockMultipartFile(
+                "empty", "empty.jpg", "image/jpeg", new byte[0]
+        );
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () ->
+                recordImageUseCase.uploadMultipleImages(1L, Collections.singletonList(emptyFile))
+        );
+    }
+
+    @Test
+    void validateImage_FileTooLarge() {
+        // Arrange
+        byte[] largeContent = new byte[6_000_000]; // Larger than 5MB
+        MultipartFile largeFile = new MockMultipartFile(
+                "large", "large.jpg", "image/jpeg", largeContent
+        );
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () ->
+                recordImageUseCase.uploadMultipleImages(1L, Collections.singletonList(largeFile))
+        );
+    }
+
+    @Test
+    void validateImage_InvalidContentType() {
+        // Arrange
+        MultipartFile invalidFile = new MockMultipartFile(
+                "invalid", "test.txt", "text/plain", "not-an-image".getBytes()
+        );
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () ->
+                recordImageUseCase.uploadMultipleImages(1L, Collections.singletonList(invalidFile))
+        );
     }
 }

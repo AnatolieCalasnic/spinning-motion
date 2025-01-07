@@ -4,13 +4,13 @@ import org.mockito.Mock;
 import org.mockito.InjectMocks;
 import org.junit.jupiter.api.BeforeEach;
 import org.myexample.spinningmotion.business.exception.InvalidEmailFormatException;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.myexample.spinningmotion.business.exception.UserNotFoundException;
 import org.myexample.spinningmotion.business.exception.EmailAlreadyExistsException;
 import org.myexample.spinningmotion.domain.user.*;
 import org.myexample.spinningmotion.persistence.UserRepository;
 import org.myexample.spinningmotion.persistence.entity.UserEntity;
-
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.extension.ExtendWith;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest
+@ExtendWith(MockitoExtension.class)
 public class UserUseCaseImplTest {
 
     @Mock

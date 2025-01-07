@@ -11,7 +11,6 @@ import org.myexample.spinningmotion.domain.notification.NotificationMessage;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,8 +33,8 @@ class NotificationUseCaseImplTest {
 
         // Then
         verify(messagingTemplate).convertAndSend(
-                eq("/topic/auth"),
-                eq(new NotificationMessage(message, type))
+                "/topic/auth",
+                new NotificationMessage(message, type)
         );
     }
 
@@ -49,8 +48,8 @@ class NotificationUseCaseImplTest {
 
         // Then
         verify(messagingTemplate).convertAndSend(
-                eq("/topic/auth"),
-                eq(new NotificationMessage("User logged in: " + email, "SUCCESS"))
+                "/topic/auth",
+                new NotificationMessage("User logged in: " + email, "SUCCESS")
         );
     }
 }

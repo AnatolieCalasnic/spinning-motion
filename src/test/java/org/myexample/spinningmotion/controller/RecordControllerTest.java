@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,6 +43,7 @@ class RecordControllerTest {
     private GetRecordResponse getRecordResponse;
     private UpdateRecordRequest updateRecordRequest;
     private UpdateRecordResponse updateRecordResponse;
+    private List<MultipartFile> emptyFileList;
 
     @BeforeEach
     void setUp() {
@@ -98,12 +100,14 @@ class RecordControllerTest {
                 .condition("Used")
                 .quantity(5)
                 .build();
+        emptyFileList = Collections.emptyList();
+
     }
 
     @Test
     void createRecord_Success() {
         when(recordUseCase.createRecord(any())).thenReturn(createRecordResponse);
-        ResponseEntity<CreateRecordResponse> response = controller.createRecord(createRecordRequest);
+        ResponseEntity<CreateRecordResponse> response = controller.createRecord(createRecordRequest, emptyFileList);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(createRecordResponse, response.getBody());
     }
@@ -144,7 +148,7 @@ class RecordControllerTest {
     @Test
     void updateRecord_Success() {
         when(recordUseCase.updateRecord(any())).thenReturn(updateRecordResponse);
-        ResponseEntity<UpdateRecordResponse> response = controller.updateRecord(updateRecordRequest, 1L);
+        ResponseEntity<UpdateRecordResponse> response = controller.updateRecord(1L,updateRecordRequest, emptyFileList);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(updateRecordResponse, response.getBody());
     }
