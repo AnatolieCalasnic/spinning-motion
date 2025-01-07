@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.myexample.spinningmotion.business.exception.InsufficientQuantityException;
 import org.myexample.spinningmotion.business.exception.PurchaseProcessingException;
 import org.myexample.spinningmotion.business.exception.StripeProcessingException;
+import org.myexample.spinningmotion.business.interfc.EmailUseCase;
 import org.myexample.spinningmotion.business.interfc.PurchaseHistoryUseCase;
 import org.myexample.spinningmotion.business.interfc.RecordUseCase;
 import org.myexample.spinningmotion.business.interfc.StripeUseCase;
@@ -35,7 +36,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 @Service
 @Slf4j
@@ -46,7 +47,7 @@ public class StripeUseCaseImpl implements StripeUseCase {
     private static final String USER_ID = "userId";
     private static final String GUEST_DETAILS = "guestDetails";
     private static final String ITEMS = "items";
-    private static String stripeSecretKey;
+    private String stripeSecretKey;
 
     @Value("${stripe.secret.key}")
     public void setStripeSecretKey(String key) {
@@ -59,6 +60,7 @@ public class StripeUseCaseImpl implements StripeUseCase {
     private final PurchaseHistoryUseCase purchaseHistoryUseCase;
     private final RecordUseCase recordUseCase;
     private final GuestOrderRepository guestOrderRepository;
+    private final EmailUseCase emailUseCase;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -164,6 +166,9 @@ public class StripeUseCaseImpl implements StripeUseCase {
                 GuestDetails guestDetails = objectMapper.readValue(guestDetailsJson, GuestDetails.class);
                 log.info("Successfully parsed guest details: {}", guestDetails);
 
+                String orderNumber = generateOrderNumber();
+                double totalOrderAmount = 0.0;
+
                 for (CheckoutRequest.Item item : items) {
                     // Create purchase history first
                     CreatePurchaseHistoryRequest purchaseRequest = CreatePurchaseHistoryRequest.builder()
@@ -174,6 +179,8 @@ public class StripeUseCaseImpl implements StripeUseCase {
                             .price(item.getPrice())
                             .totalAmount(item.getPrice() * item.getQuantity())
                             .build();
+
+                    totalOrderAmount += item.getPrice() * item.getQuantity();
 
                     log.info("Creating purchase history for guest order: {}", purchaseRequest);
                     CreatePurchaseHistoryResponse purchaseResponse = purchaseHistoryUseCase.createPurchaseHistory(purchaseRequest);
@@ -201,6 +208,18 @@ public class StripeUseCaseImpl implements StripeUseCase {
                         throw e;
                     }
                 }
+                try {
+                    log.info("Sending order confirmation email to: {}", guestDetails.getEmail());
+                    emailUseCase.sendOrderConfirmation(
+                            guestDetails.getEmail(),
+                            items,
+                            totalOrderAmount,
+                            orderNumber
+                    );
+                    log.info("Successfully sent order confirmation email");
+                } catch (Exception e) {
+                    log.error("Failed to send order confirmation email", e);
+                }
             } catch (Exception e) {
                 log.error("Error processing guest details: {}", e.getMessage(), e);
                 throw e;
@@ -220,7 +239,9 @@ public class StripeUseCaseImpl implements StripeUseCase {
             }
         }
     }
-
+    private String generateOrderNumber() {
+        return "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
 
     private Map<String, String> parseMetadata(JsonNode sessionNode) {
         JsonNode metadataNode = sessionNode.path("metadata");

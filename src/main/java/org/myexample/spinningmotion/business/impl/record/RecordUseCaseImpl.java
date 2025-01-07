@@ -10,7 +10,9 @@ import org.myexample.spinningmotion.persistence.RecordRepository;
 import org.myexample.spinningmotion.persistence.entity.GenreEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.springframework.stereotype.Service;
+import org.myexample.spinningmotion.domain.record.RecordImage;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -44,7 +46,7 @@ public class RecordUseCaseImpl implements RecordUseCase {
 
     @Override
     public List<GetRecordResponse> getAllRecords() {
-        List<RecordEntity> entities = recordRepository.findAll();
+        List<RecordEntity> entities = recordRepository.findAllWithImages();
         return entities.stream()
                 .map(this::convertToGetResponse)
                 .collect(Collectors.toList());
@@ -68,6 +70,20 @@ public class RecordUseCaseImpl implements RecordUseCase {
         recordRepository.deleteById(id);
     }
     @Override
+    public List<GetRecordResponse> getNewReleases(LocalDateTime startDate) {
+        List<RecordEntity> newReleases = recordRepository.findNewReleases(startDate);
+        return newReleases.stream()
+                .map(this::convertToGetResponse)
+                .collect(Collectors.toList());
+    }
+    @Override
+    public List<GetRecordResponse> getNewReleasesByGenre(LocalDateTime startDate, String genre) {
+        List<RecordEntity> newReleases = recordRepository.findNewReleasesByGenre(startDate, genre.toLowerCase());
+        return newReleases.stream()
+                .map(this::convertToGetResponse)
+                .collect(Collectors.toList());
+    }
+    @Override
     public List<GetRecordResponse> getRecordsByGenre(String genreName) {
         return recordRepository.findByGenreName(genreName.toLowerCase())
                 .stream()
@@ -82,6 +98,7 @@ public class RecordUseCaseImpl implements RecordUseCase {
                         .build())
                 .collect(Collectors.toList());
     }
+
     private RecordEntity convertToEntity(CreateRecordRequest request, GenreEntity genre) {
         return RecordEntity.builder()
                 .title(request.getTitle())
@@ -104,10 +121,18 @@ public class RecordUseCaseImpl implements RecordUseCase {
                 .year(entity.getYear())
                 .condition(entity.getCondition())
                 .quantity(entity.getQuantity())
+                .createdAt(entity.getCreatedAt())
                 .build();
     }
 
     private GetRecordResponse convertToGetResponse(RecordEntity entity) {
+        List<RecordImage> recordImages = entity.getImages().stream()
+                .map(imageEntity -> new RecordImage(
+                        imageEntity.getId(),
+                        imageEntity.getImageType()
+                ))
+                .collect(Collectors.toList());
+
         return GetRecordResponse.builder()
                 .id(entity.getId())
                 .title(entity.getTitle())
@@ -117,6 +142,8 @@ public class RecordUseCaseImpl implements RecordUseCase {
                 .year(entity.getYear())
                 .condition(entity.getCondition())
                 .quantity(entity.getQuantity())
+                .images(recordImages)
+                .createdAt(entity.getCreatedAt())
                 .build();
     }
 
@@ -130,6 +157,7 @@ public class RecordUseCaseImpl implements RecordUseCase {
                 .year(entity.getYear())
                 .condition(entity.getCondition())
                 .quantity(entity.getQuantity())
+                .createdAt(entity.getCreatedAt())
                 .build();
     }
 

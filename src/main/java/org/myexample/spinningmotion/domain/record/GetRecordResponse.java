@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -18,4 +20,6 @@ public class GetRecordResponse {
     private Integer year;
     private String condition;
     private Integer quantity;
+    private List<RecordImage> images;
+    private LocalDateTime createdAt;
 }

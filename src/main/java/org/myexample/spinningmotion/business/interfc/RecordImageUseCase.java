@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface RecordImageUseCase {
     RecordImageEntity uploadImage(Long recordId, MultipartFile file);
+    List<RecordImageEntity> uploadMultipleImages(Long recordId, List<MultipartFile> files);
 
     RecordImageEntity getImage(Long imageId);
 

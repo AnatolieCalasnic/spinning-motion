@@ -2,7 +2,6 @@ package org.myexample.spinningmotion.business.impl.stripe;
 
 import com.stripe.Stripe;
 import com.stripe.exception.InvalidRequestException;
-import com.stripe.exception.StripeException;
 import com.stripe.model.*;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
@@ -74,7 +73,7 @@ class StripeUseCaseImplTest {
     }
 
     @Test
-    void createCheckoutSession_Success() throws StripeException {
+    void createCheckoutSession_Success()  {
         // Given
         Session mockSession = mock(Session.class);
         when(mockSession.getId()).thenReturn(TEST_SESSION_ID);
@@ -346,7 +345,7 @@ class StripeUseCaseImplTest {
 
     }
     @Test
-    void verifySession_ValidSession() throws Exception {
+    void verifySession_ValidSession()  {
         // Given
         String sessionId = "valid_session_id";
 

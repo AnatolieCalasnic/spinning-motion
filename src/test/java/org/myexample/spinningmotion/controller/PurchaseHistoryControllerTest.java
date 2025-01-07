@@ -108,11 +108,21 @@ class PurchaseHistoryControllerTest {
     }
     @Test
     void getAllPurchaseHistories_Success() {
-        List<GetPurchaseHistoryResponse> responses = Arrays.asList(getPurchaseHistoryResponse);
-        when(purchaseHistoryUseCase.getAllPurchaseHistories(1L)).thenReturn(responses);
-        ResponseEntity<List<GetPurchaseHistoryResponse>> response = controller.getAllPurchaseHistories(1L);
+        List<GetPurchaseHistoryResponse> responses = Arrays.asList(
+                getPurchaseHistoryResponse,
+                GetPurchaseHistoryResponse.builder()
+                        .id(2L)
+                        .userId(2L)
+                        .build()
+        );
+
+        when(purchaseHistoryUseCase.getAllPurchaseHistories()).thenReturn(responses);
+
+        ResponseEntity<List<GetPurchaseHistoryResponse>> response = controller.getAllPurchaseHistories();
+
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(responses, response.getBody());
+        verify(purchaseHistoryUseCase).getAllPurchaseHistories();
     }
 
     @Test

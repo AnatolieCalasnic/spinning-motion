@@ -3,6 +3,7 @@ package org.myexample.spinningmotion.business.interfc;
 
 import org.myexample.spinningmotion.domain.record.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface RecordUseCase {
@@ -12,5 +13,7 @@ public interface RecordUseCase {
     List<GetRecordResponse> getAllRecords();
     UpdateRecordResponse updateRecord(UpdateRecordRequest request);
     void deleteRecord(Long id);
+    List<GetRecordResponse> getNewReleases(LocalDateTime startDate);
+    List<GetRecordResponse> getNewReleasesByGenre(LocalDateTime startDate, String genre);
 
 }

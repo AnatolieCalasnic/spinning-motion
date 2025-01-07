@@ -17,10 +17,8 @@ import org.myexample.spinningmotion.persistence.entity.GenreEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,6 +67,7 @@ public class RecordUseCaseImplTest {
                 .year(2020)
                 .condition("New")
                 .quantity(10)
+                .images(new ArrayList<>())
                 .build();
         lenient().when(genreRepository.findByName("Pop")).thenReturn(Optional.of(genre));
         lenient().when(genreRepository.findByName("Rock")).thenReturn(Optional.of(rockGenre));
@@ -121,7 +120,8 @@ public class RecordUseCaseImplTest {
         assertNotNull(response);
         assertEquals(recordEntity.getId(), response.getId());
         assertEquals(recordEntity.getTitle(), response.getTitle());
-
+        assertNotNull(response.getImages());
+        assertTrue(response.getImages().isEmpty());
         verify(recordRepository).findById(1L);
     }
 
@@ -137,7 +137,7 @@ public class RecordUseCaseImplTest {
     @Test
     void getAllRecords_Success() {
         List<RecordEntity> recordEntities = Arrays.asList(recordEntity);
-        when(recordRepository.findAll()).thenReturn(recordEntities);
+        when(recordRepository.findAllWithImages()).thenReturn(recordEntities);
 
         List<GetRecordResponse> responses = recordUseCase.getAllRecords();
 
@@ -146,7 +146,7 @@ public class RecordUseCaseImplTest {
         assertEquals(recordEntity.getId(), responses.get(0).getId());
         assertEquals(recordEntity.getTitle(), responses.get(0).getTitle());
 
-        verify(recordRepository).findAll();
+        verify(recordRepository).findAllWithImages();
     }
     @Test
     void getRecordsByGenre_Success() {
@@ -257,5 +257,74 @@ public class RecordUseCaseImplTest {
 
         verify(recordRepository).findById(1L);
         verify(recordRepository, never()).deleteById(anyLong());
+    }
+    @Test
+    void getNewReleases_Success() {
+        // Arrange
+        LocalDateTime startDate = LocalDateTime.now().minusDays(7);
+        List<RecordEntity> newReleases = Arrays.asList(recordEntity);
+        when(recordRepository.findNewReleases(any(LocalDateTime.class))).thenReturn(newReleases);
+
+        // Act
+        List<GetRecordResponse> responses = recordUseCase.getNewReleases(startDate);
+
+        // Assert
+        assertNotNull(responses);
+        assertEquals(1, responses.size());
+        assertEquals(recordEntity.getId(), responses.get(0).getId());
+        assertEquals(recordEntity.getTitle(), responses.get(0).getTitle());
+        assertEquals(recordEntity.getArtist(), responses.get(0).getArtist());
+
+        verify(recordRepository).findNewReleases(startDate);
+    }
+
+    @Test
+    void getNewReleases_EmptyList() {
+        // Arrange
+        LocalDateTime startDate = LocalDateTime.now().minusDays(7);
+        when(recordRepository.findNewReleases(any(LocalDateTime.class))).thenReturn(Collections.emptyList());
+
+        // Act
+        List<GetRecordResponse> responses = recordUseCase.getNewReleases(startDate);
+
+        // Assert
+        assertNotNull(responses);
+        assertTrue(responses.isEmpty());
+        verify(recordRepository).findNewReleases(startDate);
+    }
+
+    @Test
+    void getNewReleasesByGenre_Success() {
+        // Arrange
+        LocalDateTime startDate = LocalDateTime.now().minusDays(7);
+        List<RecordEntity> newReleases = Arrays.asList(recordEntity);
+        when(recordRepository.findNewReleasesByGenre(any(LocalDateTime.class), eq("pop"))).thenReturn(newReleases);
+
+        // Act
+        List<GetRecordResponse> responses = recordUseCase.getNewReleasesByGenre(startDate, "Pop");
+
+        // Assert
+        assertNotNull(responses);
+        assertEquals(1, responses.size());
+        assertEquals(recordEntity.getId(), responses.get(0).getId());
+        assertEquals(recordEntity.getTitle(), responses.get(0).getTitle());
+        assertEquals(recordEntity.getArtist(), responses.get(0).getArtist());
+
+        verify(recordRepository).findNewReleasesByGenre(startDate, "pop");
+    }
+
+    @Test
+    void getNewReleasesByGenre_EmptyList() {
+        // Arrange
+        LocalDateTime startDate = LocalDateTime.now().minusDays(7);
+        when(recordRepository.findNewReleasesByGenre(any(LocalDateTime.class), eq("pop"))).thenReturn(Collections.emptyList());
+
+        // Act
+        List<GetRecordResponse> responses = recordUseCase.getNewReleasesByGenre(startDate, "Pop");
+
+        // Assert
+        assertNotNull(responses);
+        assertTrue(responses.isEmpty());
+        verify(recordRepository).findNewReleasesByGenre(startDate, "pop");
     }
 }
