@@ -15,7 +15,14 @@ public class CheckoutRequest {
     private List<Item> items;
     private Map<String, String> metadata = new HashMap<>();
     private GuestDetails guestDetails;
+    private CouponInfo coupon;
 
+    @Data
+    @Builder
+    public static class CouponInfo {
+        private String code;
+        private int discountPercentage;
+    }
     @Data
     @Builder
     @NoArgsConstructor
@@ -27,5 +34,6 @@ public class CheckoutRequest {
         private double price;
         private int quantity = 1;
         private String condition;
+        private Double discountedPrice;
     }
 }

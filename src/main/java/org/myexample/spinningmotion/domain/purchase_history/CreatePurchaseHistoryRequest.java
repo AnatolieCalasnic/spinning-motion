@@ -16,4 +16,5 @@ public class CreatePurchaseHistoryRequest {
     private Double price;
     private Double totalAmount;
     private boolean isGuest;
+    private Integer discountPercentage;
 }

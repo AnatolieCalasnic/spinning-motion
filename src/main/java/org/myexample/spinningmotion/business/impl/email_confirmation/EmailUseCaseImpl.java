@@ -1,13 +1,13 @@
 package org.myexample.spinningmotion.business.impl.email_confirmation;
 
-
-import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.myexample.spinningmotion.business.exception.EmailSendingException;
 import org.myexample.spinningmotion.business.interfc.EmailUseCase;
+import org.myexample.spinningmotion.business.interfc.RecordImageUseCase;
 import org.myexample.spinningmotion.domain.stripe.CheckoutRequest;
+import org.myexample.spinningmotion.persistence.entity.RecordImageEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -15,6 +15,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 
+import java.util.Base64;
 import java.util.List;
 
 @Service
@@ -23,7 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class EmailUseCaseImpl implements EmailUseCase {
     private final JavaMailSender mailSender;
-
+    private final RecordImageUseCase recordImageUseCase;
     @Value("${spring.mail.username}")
     private String fromEmail;
 
@@ -49,7 +50,9 @@ public class EmailUseCaseImpl implements EmailUseCase {
             throw new EmailSendingException("Failed to send order confirmation email", e.getMessage());
         }
     }
-
+    private String convertImageToBase64(byte[] imageData, String imageType) {
+        return "data:" + imageType + ";base64," + Base64.getEncoder().encodeToString(imageData);
+    }
     private String generateEmailContent(List<CheckoutRequest.Item> items, double totalAmount, String orderNumber) {
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html>")
@@ -63,7 +66,7 @@ public class EmailUseCaseImpl implements EmailUseCase {
                 .append(".content { padding: 32px; }")
                 .append(".order-number { display: inline-block; background: #fbbf24; padding: 8px 16px; color: #000000; font-weight: bold; border: 4px solid #000000; }")
                 .append(".item { margin-bottom: 24px; border: 4px solid #000000; display: flex; }")
-                .append(".item-image { width: 120px; height: 120px; background: #3b82f6; border-right: 4px solid #000000; flex-shrink: 0; }")
+                .append(".item-image { width: 120px; height: 120px; background: #3b82f6; border-right: 4px solid #000000; flex-shrink: 0;background-position: center; background-size: cover; }")
                 .append(".item-content { flex-grow: 1; display: flex; flex-direction: column; }")
                 .append(".item-header { background: #000000; color: white; padding: 12px; font-weight: bold; }")
                 .append(".item-details { padding: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }")
@@ -87,8 +90,19 @@ public class EmailUseCaseImpl implements EmailUseCase {
 
         // Items
         for (CheckoutRequest.Item item : items) {
+            List<RecordImageEntity> images = recordImageUseCase.getImagesByRecordId(item.getRecordId());
+            String imageHtml = "<div class='item-image'></div>";
+
+            if (!images.isEmpty()) {
+                RecordImageEntity firstImage = images.get(0);
+                String base64Image = convertImageToBase64(firstImage.getImageData(), firstImage.getImageType());
+                imageHtml = "<div class='item-image' style='background-image: url(" + base64Image + "); background-size: cover; background-position: center;'></div>";
+            }
+            double displayPrice = item.getDiscountedPrice() != null ? item.getDiscountedPrice() : item.getPrice();
+            double itemTotal = displayPrice * item.getQuantity();
+
             html.append("<div class='item'>")
-                    .append("<div class='item-image'></div>")
+                    .append(imageHtml)
                     .append("<div class='item-content'>")
                     .append("<div class='item-header'>")
                     .append("<div class='item-title'>").append(item.getTitle()).append("</div>")
@@ -96,11 +110,11 @@ public class EmailUseCaseImpl implements EmailUseCase {
                     .append("</div>")
                     .append("<div class='item-details'>")
                     .append("<div>Condition: ").append(item.getCondition()).append("</div>")
-                    .append("<div class='item-price'>€").append(String.format("%.2f", item.getPrice())).append("</div>")
+                    .append("<div class='item-price'>€").append(String.format("%.2f", displayPrice)).append("</div>")
                     .append("<div class='item-quantity'>")
                     .append("<span class='quantity-value'>Quantity: ").append(item.getQuantity()).append("</span>")
                     .append("</div>")
-                    .append("<div class='item-price'>Total: €").append(String.format("%.2f", item.getPrice() * item.getQuantity())).append("</div>")
+                    .append("<div class='item-price'>Total: €").append(String.format("%.2f",itemTotal)).append("</div>")
                     .append("</div>")
                     .append("</div>")
                     .append("</div>");

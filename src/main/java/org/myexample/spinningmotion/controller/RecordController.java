@@ -134,7 +134,15 @@ public class RecordController {
         List<GetRecordResponse> response = recordUseCase.getNewReleasesByGenre(startDate, genre);
         return ResponseEntity.ok(response);
     }
-
+    @GetMapping("/popular-artists")
+    public ResponseEntity<List<GetRecordResponse>> getPopularArtists() {
+        return ResponseEntity.ok(recordUseCase.getTopThreeArtists());
+    }
+    @GetMapping("/artist/{artistName}")
+    public ResponseEntity<List<GetRecordResponse>> getRecordsByArtist(@PathVariable String artistName) {
+        List<GetRecordResponse> response = recordUseCase.getRecordsByArtist(artistName);
+        return ResponseEntity.ok(response);
+    }
     //------------------------------------------------------------------------------------------------------------------
     // Exception Handlers for Record
     @ExceptionHandler(RecordNotFoundException.class)

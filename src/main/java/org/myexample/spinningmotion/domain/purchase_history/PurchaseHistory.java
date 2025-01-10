@@ -20,4 +20,5 @@ public class PurchaseHistory {
     private Long recordId;
     private Integer quantity;
     private Double price;
+
 }

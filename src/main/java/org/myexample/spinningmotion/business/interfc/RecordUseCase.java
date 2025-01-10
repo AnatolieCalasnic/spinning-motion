@@ -2,6 +2,7 @@ package org.myexample.spinningmotion.business.interfc;
 
 
 import org.myexample.spinningmotion.domain.record.*;
+import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,5 +16,6 @@ public interface RecordUseCase {
     void deleteRecord(Long id);
     List<GetRecordResponse> getNewReleases(LocalDateTime startDate);
     List<GetRecordResponse> getNewReleasesByGenre(LocalDateTime startDate, String genre);
-
+    List<GetRecordResponse> getTopThreeArtists();
+    List<GetRecordResponse> getRecordsByArtist(String artistName);
 }
