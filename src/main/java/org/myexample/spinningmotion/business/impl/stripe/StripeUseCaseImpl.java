@@ -15,10 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.myexample.spinningmotion.business.exception.InsufficientQuantityException;
 import org.myexample.spinningmotion.business.exception.PurchaseProcessingException;
 import org.myexample.spinningmotion.business.exception.StripeProcessingException;
-import org.myexample.spinningmotion.business.interfc.EmailUseCase;
-import org.myexample.spinningmotion.business.interfc.PurchaseHistoryUseCase;
-import org.myexample.spinningmotion.business.interfc.RecordUseCase;
-import org.myexample.spinningmotion.business.interfc.StripeUseCase;
+import org.myexample.spinningmotion.business.interfc.*;
+import org.myexample.spinningmotion.domain.coupon.GenerateCouponRequest;
 import org.myexample.spinningmotion.domain.guest_user.GuestDetails;
 import org.myexample.spinningmotion.domain.purchase_history.CreatePurchaseHistoryRequest;
 import org.myexample.spinningmotion.domain.purchase_history.CreatePurchaseHistoryResponse;
@@ -27,6 +25,8 @@ import org.myexample.spinningmotion.domain.record.GetRecordResponse;
 import org.myexample.spinningmotion.domain.record.UpdateRecordRequest;
 import org.myexample.spinningmotion.domain.stripe.CheckoutRequest;
 import org.myexample.spinningmotion.domain.stripe.CheckoutResponse;
+import org.myexample.spinningmotion.domain.user.GetUserRequest;
+import org.myexample.spinningmotion.domain.user.GetUserResponse;
 import org.myexample.spinningmotion.persistence.GuestOrderRepository;
 import org.myexample.spinningmotion.persistence.entity.GuestDetailsEntity;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +34,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import java.util.stream.Collectors;
 
 import java.util.*;
 
@@ -48,7 +49,7 @@ public class StripeUseCaseImpl implements StripeUseCase {
     private static final String GUEST_DETAILS = "guestDetails";
     private static final String ITEMS = "items";
     private String stripeSecretKey;
-
+    private final CouponUseCase couponUseCase;
     @Value("${stripe.secret.key}")
     public void setStripeSecretKey(String key) {
         this.stripeSecretKey = key;
@@ -61,6 +62,7 @@ public class StripeUseCaseImpl implements StripeUseCase {
     private final RecordUseCase recordUseCase;
     private final GuestOrderRepository guestOrderRepository;
     private final EmailUseCase emailUseCase;
+    private final UserUseCase userUseCase;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -72,6 +74,36 @@ public class StripeUseCaseImpl implements StripeUseCase {
             List<SessionCreateParams.LineItem> lineItems = createLineItems(request);
             log.info("Creating checkout session. Guest details: {}", request.getGuestDetails());
 
+            boolean couponApplied = false;
+            if (request.getCoupon() != null) {
+                String couponCode = request.getCoupon().getCode();
+                if (couponUseCase.validateCoupon(couponCode)) {
+                    // Adjust the amount based on the coupon discount
+                    int discountPercentage = request.getCoupon().getDiscountPercentage();
+
+                    // Modify the line items to apply discount
+                    lineItems = lineItems.stream()
+                            .map(item -> {
+                                long originalAmount = item.getPriceData().getUnitAmount();
+                                long discountedAmount = originalAmount - (originalAmount * discountPercentage / 100);
+
+                                return SessionCreateParams.LineItem.builder()
+                                        .setPriceData(
+                                                SessionCreateParams.LineItem.PriceData.builder()
+                                                        .setCurrency(item.getPriceData().getCurrency())
+                                                        .setUnitAmount(discountedAmount)
+                                                        .setProductData(item.getPriceData().getProductData())
+                                                        .build()
+                                        )
+                                        .setQuantity(item.getQuantity())
+                                        .build();
+                            })
+                            .collect(Collectors.toList());
+
+                    couponApplied = true;
+                }
+
+            }
             SessionCreateParams.Builder paramsBuilder = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.PAYMENT)
                     .setUiMode(SessionCreateParams.UiMode.EMBEDDED)
@@ -87,6 +119,12 @@ public class StripeUseCaseImpl implements StripeUseCase {
                     request.getMetadata().getOrDefault(IS_GUEST, "true"));
             paramsBuilder.putMetadata(USER_ID,
                     request.getMetadata().getOrDefault(USER_ID, ""));
+
+            if (couponApplied && request.getCoupon() != null) {
+                paramsBuilder.putMetadata("couponCode", request.getCoupon().getCode());
+                paramsBuilder.putMetadata("couponDiscount",
+                        String.valueOf(request.getCoupon().getDiscountPercentage()));
+            }
 
             if (request.getGuestDetails() != null) {
                 String guestDetailsJson = objectMapper.writeValueAsString(request.getGuestDetails());
@@ -150,7 +188,15 @@ public class StripeUseCaseImpl implements StripeUseCase {
 
         Map<String, String> metadata = parseMetadata(sessionNode);
         log.info("Parsed metadata: {}", metadata);
+        String couponCode = metadata.get("couponCode");
+        Integer couponDiscount = metadata.containsKey("couponDiscount")
+                ? Integer.parseInt(metadata.get("couponDiscount"))
+                : null;
 
+        if (couponCode != null && couponDiscount != null) {
+            log.info("Coupon applied - Code: {}, Discount: {}%", couponCode, couponDiscount);
+            couponUseCase.markCouponAsUsed(couponCode);
+        }
         List<CheckoutRequest.Item> items = parseItems(sessionNode);
         log.info("Parsed items: {}", items);
 
@@ -170,6 +216,10 @@ public class StripeUseCaseImpl implements StripeUseCase {
                 double totalOrderAmount = 0.0;
 
                 for (CheckoutRequest.Item item : items) {
+                    double itemTotal = item.getPrice() * item.getQuantity();
+                    if (couponDiscount != null && couponDiscount > 0) {
+                        itemTotal = itemTotal * (1 - (couponDiscount / 100.0));
+                    }
                     // Create purchase history first
                     CreatePurchaseHistoryRequest purchaseRequest = CreatePurchaseHistoryRequest.builder()
                             .userId(null)
@@ -177,7 +227,8 @@ public class StripeUseCaseImpl implements StripeUseCase {
                             .recordId(item.getRecordId())
                             .quantity(item.getQuantity())
                             .price(item.getPrice())
-                            .totalAmount(item.getPrice() * item.getQuantity())
+                            .totalAmount(itemTotal)
+                            .discountPercentage(couponDiscount)
                             .build();
 
                     totalOrderAmount += item.getPrice() * item.getQuantity();
@@ -232,11 +283,71 @@ public class StripeUseCaseImpl implements StripeUseCase {
         Long userId = parseUserId(metadata, isGuest);
         for (CheckoutRequest.Item item : items) {
             try {
-                processPurchaseItem(item, userId, isGuest);
+                processPurchaseItem(item, userId, isGuest, metadata);
             } catch (Exception e) {
                 log.error("Failed to process item during checkout: {}", item, e);
                 throw new PurchaseProcessingException("Purchase processing failed", e);
             }
+        }
+        // coupon generation
+        if (userId != null) {
+            try {
+                GenerateCouponRequest couponRequest = GenerateCouponRequest.builder()
+                        .userId(userId)
+                        .timeFrameDays(30L)
+                        .requiredPurchases(3)
+                        .discountPercentage(30)
+                        .build();
+
+                boolean couponGenerated = couponUseCase.generateFrequentShopperCoupon(couponRequest);
+                if (couponGenerated) {
+                    log.info("Generated new coupon for user {}", userId);
+                }
+            } catch (Exception e) {
+                log.error("Failed to generate coupon for user {}", userId, e);
+            }
+        }
+        // send email to registered user logic
+        String recipientEmail;
+        String orderNumber = generateOrderNumber();
+        double totalOrderAmount = items.stream()
+                .mapToDouble(item -> item.getPrice() * item.getQuantity())
+                .sum();
+
+        if (isGuest) {
+            GuestDetails guestDetails = objectMapper.readValue(metadata.get(GUEST_DETAILS), GuestDetails.class);
+            recipientEmail = guestDetails.getEmail();
+        } else {
+            GetUserResponse user = userUseCase.getUser(new GetUserRequest(userId));
+            recipientEmail = user.getEmail();
+        }
+
+        try {
+            log.info("Sending order confirmation email to: {}", recipientEmail);
+            if (couponDiscount != null && couponDiscount > 0) {
+                items = items.stream()
+                        .map(item -> {
+                            double originalPrice = item.getPrice();
+                            double discountedPrice = originalPrice * (1 - (couponDiscount / 100.0));
+                            item.setDiscountedPrice(discountedPrice);
+                            return item;
+                        })
+                        .collect(Collectors.toList());
+
+                totalOrderAmount = items.stream()
+                        .mapToDouble(item -> (item.getDiscountedPrice() != null ?
+                                item.getDiscountedPrice() : item.getPrice()) * item.getQuantity())
+                        .sum();
+            }
+            emailUseCase.sendOrderConfirmation(
+                    recipientEmail,
+                    items,
+                    totalOrderAmount,
+                    orderNumber
+            );
+            log.info("Successfully sent order confirmation email");
+        } catch (Exception e) {
+            log.error("Failed to send order confirmation email", e);
         }
     }
     private String generateOrderNumber() {
@@ -280,16 +391,28 @@ public class StripeUseCaseImpl implements StripeUseCase {
         }
     }
 
-    private void processPurchaseItem(CheckoutRequest.Item item, Long userId, boolean isGuest) {
+    private void processPurchaseItem(CheckoutRequest.Item item, Long userId, boolean isGuest, Map<String, String> metadata) {
         try {
+            double originalPrice = item.getPrice();
+            double finalPrice = originalPrice;
+
+            // Apply discount for registered users
+            if (metadata.containsKey("couponDiscount")) {
+                Integer couponDiscount = Integer.parseInt(metadata.get("couponDiscount"));
+                if (couponDiscount > 0) {
+                    finalPrice = originalPrice * (1 - (couponDiscount / 100.0));
+                }
+            }
             // Create purchase history first
             CreatePurchaseHistoryRequest purchaseRequest = CreatePurchaseHistoryRequest.builder()
                     .userId(userId)
                     .isGuest(isGuest)
                     .recordId(item.getRecordId())
                     .quantity(item.getQuantity())
-                    .price(item.getPrice())
-                    .totalAmount(item.getPrice() * item.getQuantity())
+                    .price(finalPrice)
+                    .totalAmount(finalPrice * item.getQuantity())
+                    .discountPercentage(metadata.containsKey("couponDiscount") ?
+                            Integer.parseInt(metadata.get("couponDiscount")) : null)
                     .build();
 
             purchaseHistoryUseCase.createPurchaseHistory(purchaseRequest);

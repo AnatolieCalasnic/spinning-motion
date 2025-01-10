@@ -1,19 +1,24 @@
 package org.myexample.spinningmotion.business.impl.record;
 
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import org.myexample.spinningmotion.business.exception.InvalidInputException;
 import org.myexample.spinningmotion.business.exception.RecordNotFoundException;
 import org.myexample.spinningmotion.business.interfc.RecordUseCase;
 import org.myexample.spinningmotion.domain.record.*;
 import org.myexample.spinningmotion.persistence.GenreRepository;
+import org.myexample.spinningmotion.persistence.PurchaseHistoryRepository;
 import org.myexample.spinningmotion.persistence.RecordRepository;
 import org.myexample.spinningmotion.persistence.entity.GenreEntity;
+import org.myexample.spinningmotion.persistence.entity.PurchaseHistoryEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.springframework.stereotype.Service;
 import org.myexample.spinningmotion.domain.record.RecordImage;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,6 +26,7 @@ import java.util.stream.Collectors;
 public class RecordUseCaseImpl implements RecordUseCase {
     private final RecordRepository recordRepository;
     private final GenreRepository genreRepository;
+    private final PurchaseHistoryRepository purchaseHistoryRepository;
     @Override
     public CreateRecordResponse createRecord(CreateRecordRequest request) {
         if (request.getPrice() <= 0) {
@@ -77,12 +83,54 @@ public class RecordUseCaseImpl implements RecordUseCase {
                 .collect(Collectors.toList());
     }
     @Override
+    public List<GetRecordResponse> getTopThreeArtists() {
+        // Get all records
+        List<RecordEntity> allRecords = recordRepository.findAll();
+
+        // Get all purchase histories
+        List<PurchaseHistoryEntity> allPurchases = purchaseHistoryRepository.findAll();
+
+        // Group purchases by record ID and sum quantities
+        Map<Long, Integer> recordSales = allPurchases.stream()
+                .collect(Collectors.groupingBy(
+                        PurchaseHistoryEntity::getRecordId,
+                        Collectors.summingInt(PurchaseHistoryEntity::getQuantity)
+                ));
+
+        // Map records to their sales and group by artist
+        Map<String, Integer> artistTotalSales = allRecords.stream()
+                .collect(Collectors.groupingBy(
+                        RecordEntity::getArtist,
+                        Collectors.summingInt(record ->
+                                recordSales.getOrDefault(record.getId(), 0)
+                        )
+                ));
+
+        // Get top 3 artists and their best-selling records
+        return artistTotalSales.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(3)
+                .map(entry -> {
+                    // Find the best-selling record for this artist
+                    RecordEntity bestSellingRecord = allRecords.stream()
+                            .filter(record -> record.getArtist().equals(entry.getKey()))
+                            .max(Comparator.comparingInt(record ->
+                                    recordSales.getOrDefault(record.getId(), 0)
+                            ))
+                            .orElseThrow();
+
+                    return convertToGetResponse(bestSellingRecord);
+                })
+                .collect(Collectors.toList());
+    }
+    @Override
     public List<GetRecordResponse> getNewReleasesByGenre(LocalDateTime startDate, String genre) {
         List<RecordEntity> newReleases = recordRepository.findNewReleasesByGenre(startDate, genre.toLowerCase());
         return newReleases.stream()
                 .map(this::convertToGetResponse)
                 .collect(Collectors.toList());
     }
+
     @Override
     public List<GetRecordResponse> getRecordsByGenre(String genreName) {
         return recordRepository.findByGenreName(genreName.toLowerCase())
@@ -96,6 +144,13 @@ public class RecordUseCaseImpl implements RecordUseCase {
                         .condition(recordEntity.getCondition())
                         .quantity(recordEntity.getQuantity())
                         .build())
+                .collect(Collectors.toList());
+    }
+    @Override
+    public List<GetRecordResponse> getRecordsByArtist(String artistName) {
+        return recordRepository.findByArtist(artistName.replace("-", " "))
+                .stream()
+                .map(this::convertToGetResponse)
                 .collect(Collectors.toList());
     }
 

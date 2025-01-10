@@ -42,15 +42,17 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
         record.setQuantity(record.getQuantity() - request.getQuantity());
         recordRepository.save(record);
 
+        double finalPrice = request.getPrice();
+        double finalTotalAmount = finalPrice * request.getQuantity();
         PurchaseHistoryEntity purchaseHistory = PurchaseHistoryEntity.builder()
                 .userId(request.getUserId())
                 .isGuest(request.isGuest())
                 .purchaseDate(LocalDateTime.now())
                 .status("COMPLETED")
-                .totalAmount(request.getTotalAmount())
+                .totalAmount(finalTotalAmount)
                 .recordId(request.getRecordId())
                 .quantity(request.getQuantity())
-                .price(request.getPrice())
+                .price(finalPrice)
                 .build();
 
         PurchaseHistoryEntity savedPurchaseHistory = purchaseHistoryRepository.save(purchaseHistory);
@@ -60,10 +62,10 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
                 .userId(savedPurchaseHistory.getUserId())
                 .purchaseDate(savedPurchaseHistory.getPurchaseDate())
                 .status(savedPurchaseHistory.getStatus())
-                .totalAmount(savedPurchaseHistory.getTotalAmount())
+                .totalAmount(finalTotalAmount)
                 .recordId(savedPurchaseHistory.getRecordId())
                 .quantity(savedPurchaseHistory.getQuantity())
-                .price(savedPurchaseHistory.getPrice())
+                .price(finalPrice)
                 .build();
     }
 

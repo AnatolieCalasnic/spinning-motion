@@ -51,4 +51,7 @@ public interface RecordRepository extends JpaRepository<RecordEntity, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("genre") String genre
     );
+    List<RecordEntity> findByArtist(String artistName);
+
+
 }
