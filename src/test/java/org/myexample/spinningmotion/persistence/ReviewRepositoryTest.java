@@ -1,16 +1,12 @@
 package org.myexample.spinningmotion.persistence;
 
-import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.myexample.spinningmotion.persistence.entity.ReviewEntity;
 import org.myexample.spinningmotion.persistence.entity.UserEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,10 +49,10 @@ class ReviewRepositoryTest {
                 .build();
     }
 
-    private ReviewEntity createTestReview(UserEntity user, RecordEntity record) {
+    private ReviewEntity createTestReview(UserEntity user, RecordEntity vRecord) {
         return ReviewEntity.builder()
                 .user(user)
-                .record(record)
+                .record(vRecord)
                 .rating(5)
                 .comment("Great album!")
                 .createdAt(LocalDateTime.now())
@@ -67,17 +63,17 @@ class ReviewRepositoryTest {
     void findByUserIdAndRecordId_ExistingReview_ReturnsReview() {
         // Arrange
         UserEntity user = createTestUser("test@example.com");
-        RecordEntity record = createTestRecord();
+        RecordEntity vRecord = createTestRecord();
         entityManager.persist(user);
-        entityManager.persist(record);
+        entityManager.persist(vRecord);
 
-        ReviewEntity review = createTestReview(user, record);
+        ReviewEntity review = createTestReview(user, vRecord);
         entityManager.persist(review);
         entityManager.flush();
 
         // Act
         Optional<ReviewEntity> result = reviewRepository.findByUserIdAndRecordId(
-                user.getId(), record.getId());
+                user.getId(), vRecord.getId());
 
         // Assert
         assertTrue(result.isPresent());
@@ -89,17 +85,17 @@ class ReviewRepositoryTest {
         // Arrange
         UserEntity user1 = createTestUser("user1@test.com");
         UserEntity user2 = createTestUser("user2@test.com");
-        RecordEntity record = createTestRecord();
+        RecordEntity vRecord = createTestRecord();
         entityManager.persist(user1);
         entityManager.persist(user2);
-        entityManager.persist(record);
+        entityManager.persist(vRecord);
 
-        entityManager.persist(createTestReview(user1, record));
-        entityManager.persist(createTestReview(user2, record));
+        entityManager.persist(createTestReview(user1, vRecord));
+        entityManager.persist(createTestReview(user2, vRecord));
         entityManager.flush();
 
         // Act
-        List<ReviewEntity> reviews = reviewRepository.findAllByRecordId(record.getId());
+        List<ReviewEntity> reviews = reviewRepository.findAllByRecordId(vRecord.getId());
 
         // Assert
         assertEquals(2, reviews.size());
@@ -108,11 +104,11 @@ class ReviewRepositoryTest {
     void save_ReviewWithMaxRating_SavesSuccessfully() {
         // Arrange
         UserEntity user = createTestUser("test@example.com");
-        RecordEntity record = createTestRecord();
+        RecordEntity vRecord = createTestRecord();
         entityManager.persist(user);
-        entityManager.persist(record);
+        entityManager.persist(vRecord);
 
-        ReviewEntity review = createTestReview(user, record);
+        ReviewEntity review = createTestReview(user, vRecord);
         review.setRating(5);
 
         // Act
@@ -126,11 +122,11 @@ class ReviewRepositoryTest {
     void update_ReviewComment_UpdatesSuccessfully() {
         // Arrange
         UserEntity user = createTestUser("test@example.com");
-        RecordEntity record = createTestRecord();
+        RecordEntity vRecord = createTestRecord();
         entityManager.persist(user);
-        entityManager.persist(record);
+        entityManager.persist(vRecord);
 
-        ReviewEntity review = createTestReview(user, record);
+        ReviewEntity review = createTestReview(user, vRecord);
         entityManager.persist(review);
         entityManager.flush();
 
@@ -169,14 +165,14 @@ class ReviewRepositoryTest {
     void findAllByRecordId_OrderByCreatedAt_ReturnsOrderedList() {
         // Arrange
         UserEntity user = createTestUser("test@example.com");
-        RecordEntity record = createTestRecord();
+        RecordEntity vRecord = createTestRecord();
         entityManager.persist(user);
-        entityManager.persist(record);
+        entityManager.persist(vRecord);
 
-        ReviewEntity oldReview = createTestReview(user, record);
+        ReviewEntity oldReview = createTestReview(user, vRecord);
         oldReview.setCreatedAt(LocalDateTime.now().minusDays(1));
 
-        ReviewEntity newReview = createTestReview(user, record);
+        ReviewEntity newReview = createTestReview(user, vRecord);
         newReview.setCreatedAt(LocalDateTime.now());
 
         entityManager.persist(oldReview);
@@ -184,7 +180,7 @@ class ReviewRepositoryTest {
         entityManager.flush();
 
         // Act
-        List<ReviewEntity> reviews = reviewRepository.findAllByRecordId(record.getId());
+        List<ReviewEntity> reviews = reviewRepository.findAllByRecordId(vRecord.getId());
 
         // Assert
         assertTrue(reviews.get(0).getCreatedAt().isBefore(reviews.get(1).getCreatedAt()));

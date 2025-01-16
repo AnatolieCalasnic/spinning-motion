@@ -1,5 +1,5 @@
 package org.myexample.spinningmotion.business.exception;
 
 public class InvalidEmailFormatException extends RuntimeException{
-    public InvalidEmailFormatException(){super("Your email contains invalid format");}
+    public InvalidEmailFormatException(){super("Your emailtest contains invalid format");}
 }

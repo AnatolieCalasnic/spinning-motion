@@ -12,7 +12,6 @@ import jakarta.annotation.PostConstruct;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +36,7 @@ public class GenreUseCaseImpl implements GenreUseCase {
         List<GenreEntity> genres = genreRepository.findAll();
         List<Genre> genreList = genres.stream()
                 .map(this::convertToGenre)
-                .collect(Collectors.toList());
+                .toList();
         return new GetAllGenresResponse(genreList);
     }
     @Override

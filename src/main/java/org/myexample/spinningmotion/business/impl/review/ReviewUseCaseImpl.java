@@ -14,11 +14,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ReviewUseCaseImpl implements ReviewUseCase {
+    private static final String REVIEW_NOT_FOUND_MESSAGE = "Review not found with id: ";
+
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
     private final RecordRepository recordRepository;
@@ -40,7 +41,7 @@ public class ReviewUseCaseImpl implements ReviewUseCase {
     @Override
     public GetReviewResponse getReview(GetReviewRequest request) {
         ReviewEntity entity = reviewRepository.findById(request.getId())
-                .orElseThrow(() -> new ReviewNotFoundException("Review not found with id: " + request.getId()));
+                .orElseThrow(() -> new ReviewNotFoundException(REVIEW_NOT_FOUND_MESSAGE + request.getId()));
         return convertToGetResponse(entity);
     }
 
@@ -49,13 +50,13 @@ public class ReviewUseCaseImpl implements ReviewUseCase {
         List<ReviewEntity> entities = reviewRepository.findAllByRecordId(recordId);
         return entities.stream()
                 .map(this::convertToGetResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public UpdateReviewResponse updateReview(UpdateReviewRequest request) {
         ReviewEntity entity = reviewRepository.findById(request.getId())
-                .orElseThrow(() -> new ReviewNotFoundException("Review not found with id: " + request.getId()));
+                .orElseThrow(() -> new ReviewNotFoundException(REVIEW_NOT_FOUND_MESSAGE + request.getId()));
 
         updateEntityFromRequest(entity, request);
         ReviewEntity updatedEntity = reviewRepository.save(entity);
@@ -65,7 +66,7 @@ public class ReviewUseCaseImpl implements ReviewUseCase {
     @Override
     public void deleteReview(Long id) {
         if (!reviewRepository.findById(id).isPresent()) {
-            throw new ReviewNotFoundException("Review not found with id: " + id);
+            throw new ReviewNotFoundException(REVIEW_NOT_FOUND_MESSAGE+ id);
         }
         reviewRepository.deleteById(id);
     }

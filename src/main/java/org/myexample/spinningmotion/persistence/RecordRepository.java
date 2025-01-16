@@ -25,14 +25,14 @@ public interface RecordRepository extends JpaRepository<RecordEntity, Long> {
     List<RecordEntity> findByGenreName(@Param("genreName") String genreName);
 
     @Query(value = """
-        SELECT DISTINCT r.* FROM record r 
-        LEFT JOIN genre g ON r.genre_id = g.id 
-        WHERE 
-            LOWER(r.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) 
-            OR LOWER(r.artist) LIKE LOWER(CONCAT('%', :searchTerm, '%'))
-            OR CONCAT(LOWER(r.artist), ' ', LOWER(r.title)) LIKE LOWER(CONCAT('%', :searchTerm, '%'))
-        ORDER BY r.artist, r.title
-        """, nativeQuery = true)
+    SELECT DISTINCT r.* FROM record r 
+    LEFT JOIN genre g ON r.genre_id = g.id 
+    WHERE 
+        COALESCE(LOWER(TRIM(r.title)), '') LIKE LOWER(CONCAT('%', TRIM(:searchTerm), '%'))
+        OR COALESCE(LOWER(TRIM(r.artist)), '') LIKE LOWER(CONCAT('%', TRIM(:searchTerm), '%'))
+        OR COALESCE(LOWER(CONCAT(TRIM(r.artist), ' ', TRIM(r.title))), '') LIKE LOWER(CONCAT('%', TRIM(:searchTerm), '%'))
+    ORDER BY r.artist, r.title
+    """, nativeQuery = true)
     List<RecordEntity> searchRecords(@Param("searchTerm") String searchTerm);
 
     @Query(value = "SELECT r.* FROM record r " +

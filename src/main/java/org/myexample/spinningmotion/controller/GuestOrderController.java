@@ -1,15 +1,20 @@
 package org.myexample.spinningmotion.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.myexample.spinningmotion.business.exception.InvalidInputException;
+import org.myexample.spinningmotion.business.impl.user.GuestUseCaseImpl;
+import org.myexample.spinningmotion.business.interfc.GuestUseCase;
 import org.myexample.spinningmotion.domain.guest_user.GuestDetails;
+import org.myexample.spinningmotion.domain.response.ErrorResponse;
 import org.myexample.spinningmotion.persistence.GuestOrderRepository;
 import org.myexample.spinningmotion.persistence.entity.GuestDetailsEntity;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/guest-orders")
@@ -19,51 +24,58 @@ import java.util.List;
 
 public class GuestOrderController {
     private final GuestOrderRepository guestOrderRepository;
+    private final GuestUseCase guestUseCase;
 
     @GetMapping("/{purchaseHistoryId}")
     public ResponseEntity<GuestDetailsEntity> getGuestOrder(@PathVariable Long purchaseHistoryId) {
-        GuestDetailsEntity guestOrder = guestOrderRepository.findFirstByPurchaseHistoryId(purchaseHistoryId);
-
-        if (guestOrder == null) {
-            return ResponseEntity.notFound().build();
+        try {
+            GuestDetailsEntity guestOrder = guestUseCase.getGuestOrderByPurchaseId(purchaseHistoryId);
+            return ResponseEntity.ok(guestOrder);
+        } catch (InvalidInputException e) {
+            log.warn("Guest order not found: {}", e.getMessage());
+            return ResponseEntity.notFound()
+                    .build();
         }
-
-        return ResponseEntity.ok(guestOrder);
     }
     @PostMapping
-    public ResponseEntity<GuestDetailsEntity> createGuestOrder(@RequestBody GuestDetails guestDetails) {
+    public ResponseEntity<?> createGuestOrder(@Valid @RequestBody GuestDetails guestDetails) {
         log.info("Creating guest order: {}", guestDetails);
         try {
-            GuestDetailsEntity entity = GuestDetailsEntity.builder()
-                    .purchaseHistoryId(guestDetails.getPurchaseHistoryId())
-                    .fname(guestDetails.getFname())
-                    .lname(guestDetails.getLname())
-                    .email(guestDetails.getEmail())
-                    .address(guestDetails.getAddress())
-                    .postalCode(guestDetails.getPostalCode())
-                    .country(guestDetails.getCountry())
-                    .city(guestDetails.getCity())
-                    .region(guestDetails.getRegion())
-                    .phonenum(guestDetails.getPhonenum())
-                    .build();
-
-            GuestDetailsEntity savedEntity = guestOrderRepository.save(entity);
-            log.info("Successfully created guest order: {}", savedEntity);
+            GuestDetailsEntity savedEntity = guestUseCase.createGuestOrder(guestDetails);
             return ResponseEntity.ok(savedEntity);
-        } catch (Exception e) {
-            log.error("Error creating guest order", e);
-            return ResponseEntity.internalServerError().build();
+        } catch (InvalidInputException e) {
+            log.warn("Invalid guest input: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse(e.getMessage()));
         }
     }
     @GetMapping("/by-order/{orderId}")
     public ResponseEntity<List<GuestDetailsEntity>> getGuestOrdersByOrder(@PathVariable Long orderId) {
-        // This will get all guest details that share the same purchase time
-        List<GuestDetailsEntity> guestOrders = guestOrderRepository.findAllByPurchaseHistoryId(orderId);
-
-        if (guestOrders.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        try {
+            List<GuestDetailsEntity> guestOrders = guestUseCase.getGuestOrdersByOrderId(orderId);
+            return ResponseEntity.ok(guestOrders);
+        } catch (InvalidInputException e) {
+            log.warn("Guest orders not found: {}", e.getMessage());
+            return ResponseEntity.notFound()
+                    .build();
         }
+    }
 
-        return ResponseEntity.ok(guestOrders);
+    //------------------------------------------------------------------------------------------------------------------
+    // Exception Handlers for Guest
+
+    @ExceptionHandler(InvalidInputException.class)
+    public ResponseEntity<?> handleInvalidInputException(InvalidInputException e) {
+        log.warn("Invalid input: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse(e.getMessage()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleGeneralException(Exception e) {  // Changed to Object
+        log.error("Unexpected error", e);
+        return ResponseEntity.internalServerError()
+                .body(new ErrorResponse("An unexpected error occurred"));
     }
 }
+

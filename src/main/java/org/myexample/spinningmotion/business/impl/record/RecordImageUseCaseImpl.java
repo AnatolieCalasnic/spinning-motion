@@ -2,6 +2,7 @@ package org.myexample.spinningmotion.business.impl.record;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.myexample.spinningmotion.business.exception.ImageProcessingException;
 import org.myexample.spinningmotion.business.interfc.RecordImageUseCase;
 import org.myexample.spinningmotion.persistence.RecordImageRepository;
 import org.myexample.spinningmotion.persistence.RecordRepository;
@@ -20,36 +21,38 @@ public class RecordImageUseCaseImpl implements RecordImageUseCase {
     private final RecordImageRepository recordImageRepository;
     private final RecordRepository recordRepository;
     private static final int MAX_IMAGES = 4;
-
+    
     @Override
     @Transactional
     public RecordImageEntity uploadImage(Long recordId, MultipartFile file) {
         try {
-            RecordEntity record = recordRepository.findById(recordId)
+            RecordEntity vinylRecord = recordRepository.findById(recordId)
                     .orElseThrow(() -> new RuntimeException("Record not found"));
 
             RecordImageEntity image = RecordImageEntity.builder()
-                    .record(record)
+                    .record(vinylRecord)
                     .imageData(file.getBytes())
                     .imageType(file.getContentType())
                     .build();
 
             return recordImageRepository.save(image);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to upload image", e);
+            throw new ImageProcessingException("Failed to upload image", e);
         }
 
     }
     @Override
     @Transactional
     public List<RecordImageEntity> uploadMultipleImages(Long recordId, List<MultipartFile> files) {
-        RecordEntity record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("Record not found"));
+        RecordEntity vinylRecord = recordRepository.findById(recordId)
+                .orElseThrow(() -> new ImageProcessingException("Record not found"));
 
         // Check existing images count
         List<RecordImageEntity> existingImages = recordImageRepository.findByRecordId(recordId);
         if (existingImages.size() + files.size() > MAX_IMAGES) {
-            throw new RuntimeException("Maximum number of images would be exceeded");
+            throw new ImageProcessingException(
+                    String.format("Maximum number of images (%d) would be exceeded", MAX_IMAGES)
+            );
         }
 
         List<RecordImageEntity> newImages = new ArrayList<>();
@@ -60,20 +63,20 @@ public class RecordImageUseCaseImpl implements RecordImageUseCase {
                 byte[] imageBytes = file.getBytes();
 
                 RecordImageEntity image = RecordImageEntity.builder()
-                        .record(record)
+                        .record(vinylRecord)
                         .imageData(imageBytes)
                         .imageType(file.getContentType())
                         .build();
 
                 newImages.add(recordImageRepository.save(image));
             } catch (IOException e) {
-                throw new RuntimeException("Failed to process image: " + e.getMessage());
+                throw new ImageProcessingException("Failed to process image", e);
             }
         }
 
         // Add images to record and update
-        record.getImages().addAll(newImages);
-        recordRepository.save(record);
+        vinylRecord.getImages().addAll(newImages);
+        recordRepository.save(vinylRecord);
 
         return newImages;
     }
@@ -99,9 +102,9 @@ public class RecordImageUseCaseImpl implements RecordImageUseCase {
                 .orElseThrow(() -> new RuntimeException("Image not found"));
 
         // Remove image from record's image list
-        RecordEntity record = image.getRecord();
-        record.getImages().remove(image);
-        recordRepository.save(record);
+        RecordEntity vRecord = image.getRecord();
+        vRecord.getImages().remove(image);
+        recordRepository.save(vRecord);
 
         // Delete the image
         recordImageRepository.deleteById(imageId);
@@ -115,16 +118,17 @@ public class RecordImageUseCaseImpl implements RecordImageUseCase {
 
     private void validateImage(MultipartFile file) {
         if (file.isEmpty()) {
-            throw new RuntimeException("File is empty");
+            throw new ImageProcessingException("File is empty");
         }
 
         if (file.getSize() > 5_000_000) { // 5MB limit
-            throw new RuntimeException("File too large");
+            throw new ImageProcessingException(
+                    String.format("File too large. Maximum size allowed is %d MB", 5)
+            );
         }
 
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new RuntimeException("Not an image file");
-        }
+            throw new ImageProcessingException("Invalid file type. Only image files are allowed");        }
     }
 }

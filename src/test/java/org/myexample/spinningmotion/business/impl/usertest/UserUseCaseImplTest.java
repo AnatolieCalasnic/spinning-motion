@@ -1,4 +1,4 @@
-package org.myexample.spinningmotion.business.impl.user;
+package org.myexample.spinningmotion.business.impl.usertest;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.InjectMocks;
@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.myexample.spinningmotion.business.exception.InvalidEmailFormatException;
 import org.myexample.spinningmotion.business.exception.UserNotFoundException;
 import org.myexample.spinningmotion.business.exception.EmailAlreadyExistsException;
+import org.myexample.spinningmotion.business.impl.user.UserUseCaseImpl;
 import org.myexample.spinningmotion.domain.user.*;
 import org.myexample.spinningmotion.persistence.UserRepository;
 import org.myexample.spinningmotion.persistence.entity.UserEntity;
@@ -20,7 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class UserUseCaseImplTest {
+class UserUseCaseImplTest {
 
     @Mock
     private UserRepository userRepository;
@@ -101,7 +102,7 @@ public class UserUseCaseImplTest {
     }
     @Test
     void createUser_InvalidEmailFormat() {
-        createUserRequest.setEmail("invalid-email");
+        createUserRequest.setEmail("invalid-emailtest");
         assertThrows(InvalidEmailFormatException.class, () -> userUseCase.createUser(createUserRequest));
     }
     @Test
@@ -127,9 +128,10 @@ public class UserUseCaseImplTest {
 
     @Test
     void getUser_UserNotFound() {
+        GetUserRequest request = new GetUserRequest(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(UserNotFoundException.class, () -> userUseCase.getUser(new GetUserRequest(1L)));
+        assertThrows(UserNotFoundException.class, () -> {userUseCase.getUser(request);});
 
         verify(userRepository).findById(1L);
     }

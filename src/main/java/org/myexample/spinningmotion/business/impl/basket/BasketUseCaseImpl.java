@@ -16,21 +16,27 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class BasketUseCaseImpl implements BasketUseCase {
+    private static final String BASKET_NOT_FOUND_MESSAGE = "Basket not found for user: ";
+
     private final BasketRepository basketRepository;
     private final RecordRepository recordRepository;
+    private void validateQuantity(int quantity, String itemTitle) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than 0 for item: " + itemTitle);
+        }
+    }
 
     @Override
     public GetBasketResponse getBasket(Long userId) {
         BasketEntity basket = basketRepository.findByUserId(userId)
-                .orElseThrow(() -> new BasketNotFoundException("Basket not found for user: " + userId));
+                .orElseThrow(() -> new BasketNotFoundException(BASKET_NOT_FOUND_MESSAGE + userId));
 
         List<BasketItem> items = basket.getItems().stream()
                 .map(this::convertToBasketItem)
-                .collect(Collectors.toList());
+                .toList();
 
         return GetBasketResponse.builder()
                 .id(basket.getId())
@@ -44,7 +50,7 @@ public class BasketUseCaseImpl implements BasketUseCase {
         BasketEntity basket = basketRepository.findByUserId(request.getUserId())
                 .orElseGet(() -> createNewBasket(request.getUserId()));
 
-        RecordEntity record = recordRepository.findById(request.getRecordId())
+        RecordEntity vRecord = recordRepository.findById(request.getRecordId())
                 .orElseThrow(() -> new RecordNotFoundException("Record not found with id: " + request.getRecordId()));
         BasketItemEntity existingItem = basket.getItems().stream()
                 .filter(item -> item.getRecordId().equals(request.getRecordId()))
@@ -54,9 +60,11 @@ public class BasketUseCaseImpl implements BasketUseCase {
         // Calculate total requested quantity (existing + new)
         int totalRequestedQuantity = (existingItem != null ? existingItem.getQuantity() : 0) + request.getQuantity();
 
+        validateQuantity(totalRequestedQuantity, vRecord.getTitle());
+
         // Check if enough stock is available
-        if (record.getQuantity() < totalRequestedQuantity) {
-            throw new OutOfStockException(record.getTitle(), totalRequestedQuantity, record.getQuantity());
+        if (vRecord.getQuantity() < totalRequestedQuantity) {
+            throw new OutOfStockException(vRecord.getTitle(), totalRequestedQuantity, vRecord.getQuantity());
         }
 
         if (existingItem != null) {
@@ -73,25 +81,27 @@ public class BasketUseCaseImpl implements BasketUseCase {
         basketRepository.save(basket);
 
         // updating the record's quantity
-        record.setQuantity(record.getQuantity() - request.getQuantity());
-        recordRepository.save(record);
+        vRecord.setQuantity(vRecord.getQuantity() - request.getQuantity());
+        recordRepository.save(vRecord);
     }
 
     @Override
     public void updateBasketItemQuantity(UpdateBasketItemQuantityRequest request) {
+        validateQuantity(request.getQuantity(), "Record");
+
         BasketEntity basket = basketRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new BasketNotFoundException("Basket not found for user: " + request.getUserId()));
+                .orElseThrow(() -> new BasketNotFoundException(BASKET_NOT_FOUND_MESSAGE  + request.getUserId()));
 
         BasketItemEntity itemToUpdate = basket.getItems().stream()
                 .filter(item -> item.getRecordId().equals(request.getRecordId()))
                 .findFirst()
                 .orElseThrow(() -> new RecordNotInBasketException(request.getRecordId(), request.getUserId()));
 
-        RecordEntity record = recordRepository.findById(request.getRecordId())
-                .orElseThrow(() -> new RecordNotFoundException("Record not found with id: " + request.getRecordId()));
+        RecordEntity vRecord = recordRepository.findById(request.getRecordId())
+                .orElseThrow(() -> new RecordNotFoundException(BASKET_NOT_FOUND_MESSAGE  + request.getRecordId()));
 
-        if (record.getQuantity() < request.getQuantity()) {
-            throw new OutOfStockException(record.getTitle(), request.getQuantity(), record.getQuantity());
+        if (vRecord.getQuantity() < request.getQuantity()) {
+            throw new OutOfStockException(vRecord.getTitle(), request.getQuantity(), vRecord.getQuantity());
         }
 
         itemToUpdate.setQuantity(request.getQuantity());
@@ -101,7 +111,7 @@ public class BasketUseCaseImpl implements BasketUseCase {
     @Override
     public void removeFromBasket(Long userId, Long recordId) {
         BasketEntity basket = basketRepository.findByUserId(userId)
-                .orElseThrow(() -> new BasketNotFoundException("Basket not found for user: " + userId));
+                .orElseThrow(() -> new BasketNotFoundException(BASKET_NOT_FOUND_MESSAGE  + userId));
 
         boolean removed = basket.getItems().removeIf(item -> item.getRecordId().equals(recordId));
         if (!removed) {

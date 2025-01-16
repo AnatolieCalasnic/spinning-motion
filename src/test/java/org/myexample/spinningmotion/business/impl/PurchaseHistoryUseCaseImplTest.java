@@ -71,7 +71,7 @@ class PurchaseHistoryUseCaseImplTest {
 
         assertNotNull(response);
         assertEquals(purchaseHistoryEntity.getId(), response.getId());
-        assertEquals(purchaseHistoryEntity.getTotalAmount(), response.getTotalAmount());
+        assertEquals(20.0, response.getTotalAmount());
         verify(recordRepository).findById(createRequest.getRecordId());
         verify(purchaseHistoryRepository).save(any(PurchaseHistoryEntity.class));
     }
@@ -107,10 +107,11 @@ class PurchaseHistoryUseCaseImplTest {
 
     @Test
     void getPurchaseHistory_NotFound() {
+        GetPurchaseHistoryRequest request = new GetPurchaseHistoryRequest(1L);
         when(purchaseHistoryRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(PurchaseHistoryNotFoundException.class, () -> purchaseHistoryUseCase.getPurchaseHistory(new GetPurchaseHistoryRequest(1L)));
-
+        assertThrows(PurchaseHistoryNotFoundException.class, () -> { purchaseHistoryUseCase.getPurchaseHistory(request);
+    });
         verify(purchaseHistoryRepository).findById(1L);
     }
 

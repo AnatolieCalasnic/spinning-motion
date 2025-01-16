@@ -2,7 +2,6 @@ package org.myexample.spinningmotion.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.myexample.spinningmotion.business.interfc.GenreUseCase;
-import org.myexample.spinningmotion.domain.enums.GenreEnum;
 import org.myexample.spinningmotion.domain.genre.*;
 import org.myexample.spinningmotion.business.exception.*;
 import org.springframework.http.ResponseEntity;

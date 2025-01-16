@@ -12,7 +12,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Record {
+public class  Record {
     private Long id;
     private String title;
     private String artist;

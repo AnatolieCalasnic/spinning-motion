@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
+
+
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +47,7 @@ public class CouponUseCaseImpl implements CouponUseCase {
                 .getAllPurchaseHistories(request.getUserId())
                 .stream()
                 .filter(p -> p.getPurchaseDate().isAfter(thirtyDaysAgo))
-                .collect(Collectors.toList());
+                .toList();
 
         // Count total completed purchases in timeframe
         long purchaseCount = recentPurchases.size();
@@ -85,7 +86,7 @@ public class CouponUseCaseImpl implements CouponUseCase {
         return couponRepository.findByUserId(userId)
                 .stream()
                 .map(this::mapToCoupon)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -93,11 +94,21 @@ public class CouponUseCaseImpl implements CouponUseCase {
         Optional<CouponEntity> couponOpt = couponRepository.findByCouponCode(couponCode);
         if (couponOpt.isPresent()) {
             CouponEntity coupon = couponOpt.get();
+
+            // Check if the coupon is already marked as used
+            if (coupon.getIsUsed()) {
+                log.info("Coupon {} is already marked as used.", couponCode);
+                return false; // Return false if the coupon is already used
+            }
+
+            // Mark as used and save
             coupon.setIsUsed(true);
             couponRepository.save(coupon);
+            log.info("Coupon {} has been successfully marked as used.", couponCode);
             return true;
         }
-        return false;
+        log.warn("Coupon {} does not exist or is invalid.", couponCode);
+        return false; // Return false if the coupon does not exist
     }
 
     @Override

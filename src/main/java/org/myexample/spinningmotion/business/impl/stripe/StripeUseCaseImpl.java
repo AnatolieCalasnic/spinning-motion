@@ -10,16 +10,14 @@ import com.stripe.model.Event;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.myexample.spinningmotion.business.exception.InsufficientQuantityException;
-import org.myexample.spinningmotion.business.exception.PurchaseProcessingException;
-import org.myexample.spinningmotion.business.exception.StripeProcessingException;
+import org.myexample.spinningmotion.business.exception.*;
 import org.myexample.spinningmotion.business.interfc.*;
 import org.myexample.spinningmotion.domain.coupon.GenerateCouponRequest;
 import org.myexample.spinningmotion.domain.guest_user.GuestDetails;
 import org.myexample.spinningmotion.domain.purchase_history.CreatePurchaseHistoryRequest;
-import org.myexample.spinningmotion.domain.purchase_history.CreatePurchaseHistoryResponse;
 import org.myexample.spinningmotion.domain.record.GetRecordRequest;
 import org.myexample.spinningmotion.domain.record.GetRecordResponse;
 import org.myexample.spinningmotion.domain.record.UpdateRecordRequest;
@@ -28,16 +26,18 @@ import org.myexample.spinningmotion.domain.stripe.CheckoutResponse;
 import org.myexample.spinningmotion.domain.user.GetUserRequest;
 import org.myexample.spinningmotion.domain.user.GetUserResponse;
 import org.myexample.spinningmotion.persistence.GuestOrderRepository;
-import org.myexample.spinningmotion.persistence.entity.GuestDetailsEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import java.util.stream.Collectors;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.EnableRetry;
 
 import java.util.*;
 
+@EnableRetry
 
 @Service
 @Slf4j
@@ -48,8 +48,19 @@ public class StripeUseCaseImpl implements StripeUseCase {
     private static final String USER_ID = "userId";
     private static final String GUEST_DETAILS = "guestDetails";
     private static final String ITEMS = "items";
+    private static final String COUPON_CODE = "couponCode";
+    private static final String COUPON_DISCOUNT = "couponDiscount";
+    private static final String OBJECT = "object";
+    private static final String METADATA = "metadata";
+    private static final String DATA = "data";
     private String stripeSecretKey;
     private final CouponUseCase couponUseCase;
+    private final PurchaseHistoryUseCase purchaseHistoryUseCase;
+    private final RecordUseCase recordUseCase;
+    private final GuestOrderRepository guestOrderRepository;
+    private final EmailUseCase emailUseCase;
+    private final UserUseCase userUseCase;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     @Value("${stripe.secret.key}")
     public void setStripeSecretKey(String key) {
         this.stripeSecretKey = key;
@@ -57,22 +68,171 @@ public class StripeUseCaseImpl implements StripeUseCase {
 
     @Value("${stripe.webhook.secret}")
     private String webhookSecret;
+    private record ValidationContext(CheckoutRequest request, String origin) {}
 
-    private final PurchaseHistoryUseCase purchaseHistoryUseCase;
-    private final RecordUseCase recordUseCase;
-    private final GuestOrderRepository guestOrderRepository;
-    private final EmailUseCase emailUseCase;
-    private final UserUseCase userUseCase;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private void validateCheckoutRequest(CheckoutRequest request, String origin) {
+        ValidationContext context = new ValidationContext(request, origin);
+        validateBasicRequirements(context);
+        validateItems(request.getItems());
+        validateCoupon(request.getCoupon());
+    }
+
+    private void validateBasicRequirements(ValidationContext context) {
+        if (context.request() == null) {
+            throw new InvalidInputException("CheckoutRequest cannot be null");
+        }
+        if (context.origin() == null || context.origin().trim().isEmpty()) {
+            throw new InvalidInputException("Origin cannot be null or empty");
+        }
+        if (context.request().getItems() == null || context.request().getItems().isEmpty()) {
+            throw new InvalidInputException("At least one item must be present in the request");
+        }
+    }
+
+    private void validateItems(List<CheckoutRequest.Item> items) {
+        for (CheckoutRequest.Item item : items) {
+            validateSingleItem(item);
+        }
+    }
+
+    private void validateSingleItem(CheckoutRequest.Item item) {
+        if (item.getTitle() == null || item.getTitle().trim().isEmpty()) {
+            throw new InvalidInputException("Item title cannot be null or empty");
+        }
+        if (item.getPrice() <= 0) {
+            throw new InvalidInputException("Item price must be greater than zero");
+        }
+        if (item.getQuantity() <= 0) {
+            throw new InvalidInputException("Item quantity must be greater than zero");
+        }
+    }
+
+    private void validateCoupon(CheckoutRequest.CouponInfo coupon) {
+        if (coupon == null) {
+            return;
+        }
+
+        if (coupon.getCode() == null || coupon.getCode().trim().isEmpty()) {
+            throw new InvalidInputException("Coupon code cannot be null or empty");
+        }
+        if (coupon.getDiscountPercentage() < 0 || coupon.getDiscountPercentage() > 100) {
+            throw new InvalidInputException("Coupon discount must be between 0 and 100");
+        }
+    }
+
+    private void validateProcessCheckoutRequest(String payload) throws PurchaseProcessingException {
+        try {
+            JsonNode payloadNode = parseAndValidatePayload(payload);
+            JsonNode sessionNode = payloadNode.get(DATA).get(OBJECT);
+            Map<String, String> metadata = validateAndExtractMetadata(sessionNode);
+            validateCheckoutMetadata(metadata);
+        } catch (JsonProcessingException e) {
+            throw new PurchaseProcessingException("Invalid payload format.", e);
+        }
+    }
+
+    private JsonNode parseAndValidatePayload(String payload) throws JsonProcessingException, PurchaseProcessingException {
+        JsonNode payloadNode = objectMapper.readTree(payload);
+        if (!payloadNode.has(DATA) || !payloadNode.get(DATA).has(OBJECT)) {
+            throw new PurchaseProcessingException("Invalid payload: Missing 'data' or 'object' structure.");
+        }
+        return payloadNode;
+    }
+
+    private Map<String, String> validateAndExtractMetadata(JsonNode sessionNode) throws PurchaseProcessingException {
+        if (!sessionNode.has(METADATA)) {
+            throw new PurchaseProcessingException("Invalid session: Metadata is missing.");
+        }
+
+        JsonNode metadataNode = sessionNode.get(METADATA);
+        Map<String, String> metadata = objectMapper.convertValue(metadataNode, new TypeReference<>() {});
+
+        if (metadata.isEmpty()) {
+            throw new PurchaseProcessingException("Invalid session: Metadata is empty.");
+        }
+
+        return metadata;
+    }
+
+    private void validateCheckoutMetadata(Map<String, String> metadata) throws JsonProcessingException, PurchaseProcessingException {
+        validateUserInformation(metadata);
+        validateItemsInformation(metadata);
+        validateGuestInformation(metadata);
+        validateCouponInformation(metadata);
+    }
+
+    private void validateUserInformation(Map<String, String> metadata) throws PurchaseProcessingException {
+        boolean isGuest = parseIsGuest(metadata);
+        if (!isGuest && (!metadata.containsKey(USER_ID) || metadata.get(USER_ID).isEmpty())) {
+            throw new PurchaseProcessingException("Invalid session: User ID is missing for non-guest checkout.");
+        }
+    }
+
+    private void validateItemsInformation(Map<String, String> metadata) throws JsonProcessingException, PurchaseProcessingException {
+        if (!metadata.containsKey(ITEMS)) {
+            throw new PurchaseProcessingException("Invalid session: Items are missing.");
+        }
+
+        List<CheckoutRequest.Item> items = objectMapper.readValue(
+                metadata.get(ITEMS),
+                new TypeReference<>() {}
+        );
+
+        if (items.isEmpty()) {
+            throw new PurchaseProcessingException("Invalid session: No items found.");
+        }
+
+        for (CheckoutRequest.Item item : items) {
+            validateItemDetails(item);
+        }
+    }
+
+    private void validateItemDetails(CheckoutRequest.Item item) throws PurchaseProcessingException {
+        if (item.getRecordId() == null || item.getRecordId() <= 0) {
+            throw new PurchaseProcessingException("Invalid item: Record ID is missing or invalid.");
+        }
+        if (item.getPrice() <= 0) {
+            throw new PurchaseProcessingException("Invalid item: Price must be greater than zero.");
+        }
+        if (item.getQuantity() <= 0) {
+            throw new PurchaseProcessingException("Invalid item: Quantity must be greater than zero.");
+        }
+    }
+
+    private void validateGuestInformation(Map<String, String> metadata) throws JsonProcessingException, PurchaseProcessingException {
+        if (parseIsGuest(metadata) && metadata.containsKey(GUEST_DETAILS)) {
+            GuestDetails guestDetails = objectMapper.readValue(metadata.get(GUEST_DETAILS), GuestDetails.class);
+            if (guestDetails.getEmail() == null || guestDetails.getEmail().isEmpty()) {
+                throw new PurchaseProcessingException("Invalid guest details: Email is missing.");
+            }
+        }
+    }
+
+    private void validateCouponInformation(Map<String, String> metadata) throws PurchaseProcessingException {
+        if (metadata.containsKey(COUPON_CODE)) {
+            String couponCode = metadata.get(COUPON_CODE);
+            Integer couponDiscount = metadata.containsKey(COUPON_DISCOUNT)
+                    ? Integer.parseInt(metadata.get(COUPON_DISCOUNT))
+                    : null;
+
+            if (couponDiscount != null && (couponDiscount < 0 || couponDiscount > 100)) {
+                throw new PurchaseProcessingException("Invalid coupon discount: Must be between 0 and 100.");
+            }
+            if (!couponUseCase.validateCoupon(couponCode)) {
+                throw new PurchaseProcessingException("Invalid coupon: The coupon code is not valid.");
+            }
+        }
+    }
+
 
     @Override
     public CheckoutResponse createCheckoutSession(CheckoutRequest request, String origin) {
+        validateCheckoutRequest(request, origin);
         try {
             synchronized (StripeUseCaseImpl.class) {
                 Stripe.apiKey = stripeSecretKey;
             }
             List<SessionCreateParams.LineItem> lineItems = createLineItems(request);
-            log.info("Creating checkout session. Guest details: {}", request.getGuestDetails());
 
             boolean couponApplied = false;
             if (request.getCoupon() != null) {
@@ -98,7 +258,7 @@ public class StripeUseCaseImpl implements StripeUseCase {
                                         .setQuantity(item.getQuantity())
                                         .build();
                             })
-                            .collect(Collectors.toList());
+                            .toList();
 
                     couponApplied = true;
                 }
@@ -109,20 +269,27 @@ public class StripeUseCaseImpl implements StripeUseCase {
                     .setUiMode(SessionCreateParams.UiMode.EMBEDDED)
                     .setReturnUrl(origin + "/success?session_id={CHECKOUT_SESSION_ID}")
                     .addAllLineItem(lineItems);
-
-            // Store comprehensive metadata
+            // Store comprehensive metadata with explicit user status
             String itemsJson = objectMapper.writeValueAsString(request.getItems());
             paramsBuilder.putMetadata(ITEMS, itemsJson);
 
-            // Add user and guest metadata
-            paramsBuilder.putMetadata(IS_GUEST,
-                    request.getMetadata().getOrDefault(IS_GUEST, "true"));
-            paramsBuilder.putMetadata(USER_ID,
-                    request.getMetadata().getOrDefault(USER_ID, ""));
+            // Enhanced user metadata handling
+            boolean isGuest = Boolean.parseBoolean(request.getMetadata().getOrDefault(IS_GUEST, "true"));
+            if  (!isGuest && request.getMetadata().get(USER_ID) != null) {
+                String userId = request.getMetadata().get(USER_ID);
+                if (userId != null && !userId.isEmpty()) {
+                    paramsBuilder.putMetadata(USER_ID, userId);
+                    paramsBuilder.putMetadata(IS_GUEST, "false");
+                    log.info("Processing as registered user with ID: {}", userId);
+                }
+            } else {
+                paramsBuilder.putMetadata(IS_GUEST, "true");
+                log.info("Processing as guest user");
+            }
 
             if (couponApplied && request.getCoupon() != null) {
-                paramsBuilder.putMetadata("couponCode", request.getCoupon().getCode());
-                paramsBuilder.putMetadata("couponDiscount",
+                paramsBuilder.putMetadata(COUPON_CODE, request.getCoupon().getCode());
+                paramsBuilder.putMetadata(COUPON_DISCOUNT,
                         String.valueOf(request.getCoupon().getDiscountPercentage()));
             }
 
@@ -164,14 +331,14 @@ public class StripeUseCaseImpl implements StripeUseCase {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<String> handleWebhook(String payload, String sigHeader) {
         try {
             Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
             log.info("Webhook event type: {}", event.getType());
 
             if ("checkout.session.completed".equals(event.getType())) {
-                processCheckoutSession(payload);
-                return ResponseEntity.ok("Checkout session processed successfully");
+                return processCheckoutSessionWithRetry(payload);
             }
 
             return ResponseEntity.ok("Webhook processed successfully");
@@ -181,115 +348,135 @@ public class StripeUseCaseImpl implements StripeUseCase {
                     .body("Webhook processing failed: " + e.getMessage());
         }
     }
+    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000))
+    private ResponseEntity<String> processCheckoutSessionWithRetry(String payload) {
+        try {
+            processCheckoutSession(payload);
+            return ResponseEntity.ok("Checkout session processed successfully");
+        } catch (Exception e) {
+            log.error("Failed to process checkout session after retries", e);
+            throw new PurchaseProcessingException("Failed to process checkout session", e);
+        }
+    }
 
-    private void processCheckoutSession(String payload) throws Exception {
+    private void processCheckoutSession(String payload) {
+        try {
+            validateProcessCheckoutRequest(payload);
+            JsonNode sessionNode = extractSessionNode(payload);
+            Map<String, String> metadata = parseMetadata(sessionNode);
+            logMetadataDetails(metadata);
+
+            List<CheckoutRequest.Item> items = parseItems(sessionNode);
+            boolean isGuest = parseIsGuest(metadata);
+            Long userId = parseUserId(metadata, isGuest);
+            String orderNumber = generateOrderNumber();
+
+            items = processCouponAndDiscount(metadata, items);
+            double totalOrderAmount = calculateTotalAmount(items);
+
+            processAllItems(items, userId, isGuest, metadata);
+            String recipientEmail = getRecipientEmail(isGuest, userId, metadata);
+
+            sendOrderConfirmationWithRetry(recipientEmail, items, totalOrderAmount, orderNumber);
+            handleFrequentShopperCoupon(userId);
+        } catch (JsonProcessingException e) {
+            throw new CheckoutProcessingException(
+                    "Failed to process checkout payload: " + e.getMessage(),
+                    CheckoutProcessingException.CheckoutErrorType.INVALID_PAYLOAD,
+                    e
+            );
+        } catch (InsufficientQuantityException e) {
+            throw new CheckoutProcessingException(
+                    "Insufficient inventory during checkout: " + e.getMessage(),
+                    CheckoutProcessingException.CheckoutErrorType.INSUFFICIENT_INVENTORY,
+                    e
+            );
+        } catch (InvalidInputException e) {
+            throw new CheckoutProcessingException(
+                    "Invalid checkout input: " + e.getMessage(),
+                    CheckoutProcessingException.CheckoutErrorType.INVALID_METADATA,
+                    e
+            );
+        } catch (Exception e) {
+            throw new CheckoutProcessingException(
+                    "Unexpected error during checkout processing: " + e.getMessage(),
+                    CheckoutProcessingException.CheckoutErrorType.PROCESSING_ERROR,
+                    e
+            );
+        }
+    }
+
+    private JsonNode extractSessionNode(String payload) throws JsonProcessingException {
         JsonNode jsonNode = objectMapper.readTree(payload);
-        JsonNode sessionNode = jsonNode.path("data").path("object");
+        JsonNode sessionNode = jsonNode.path(DATA).path(OBJECT);
+        log.debug("Processing session node: {}", sessionNode);
+        return sessionNode;
+    }
 
-        Map<String, String> metadata = parseMetadata(sessionNode);
-        log.info("Parsed metadata: {}", metadata);
-        String couponCode = metadata.get("couponCode");
-        Integer couponDiscount = metadata.containsKey("couponDiscount")
-                ? Integer.parseInt(metadata.get("couponDiscount"))
+    private void logMetadataDetails(Map<String, String> metadata) {
+        log.debug("Parsed metadata: {}", metadata);
+        if (metadata.containsKey(GUEST_DETAILS)) {
+            log.debug("Raw guest details from metadata: {}", metadata.get(GUEST_DETAILS));
+        }
+    }
+
+    private List<CheckoutRequest.Item> processCouponAndDiscount(Map<String, String> metadata,
+                                                                List<CheckoutRequest.Item> items) {
+        String couponCode = metadata.get(COUPON_CODE);
+        Integer couponDiscount = metadata.containsKey(COUPON_DISCOUNT)
+                ? Integer.parseInt(metadata.get(COUPON_DISCOUNT))
                 : null;
 
         if (couponCode != null && couponDiscount != null) {
             log.info("Coupon applied - Code: {}, Discount: {}%", couponCode, couponDiscount);
             couponUseCase.markCouponAsUsed(couponCode);
         }
-        List<CheckoutRequest.Item> items = parseItems(sessionNode);
-        log.info("Parsed items: {}", items);
 
-        boolean isGuest = parseIsGuest(metadata);
-        log.info("Is guest order: {}", isGuest);
+        return applyDiscount(items, couponDiscount);
+    }
 
-        if (isGuest && metadata.containsKey(GUEST_DETAILS)) {
-            log.info("Guest details found in metadata");
-            String guestDetailsJson = metadata.get(GUEST_DETAILS);
-            log.info("Guest details JSON: {}", guestDetailsJson);
-
-            try {
-                GuestDetails guestDetails = objectMapper.readValue(guestDetailsJson, GuestDetails.class);
-                log.info("Successfully parsed guest details: {}", guestDetails);
-
-                String orderNumber = generateOrderNumber();
-                double totalOrderAmount = 0.0;
-
-                for (CheckoutRequest.Item item : items) {
-                    double itemTotal = item.getPrice() * item.getQuantity();
-                    if (couponDiscount != null && couponDiscount > 0) {
-                        itemTotal = itemTotal * (1 - (couponDiscount / 100.0));
-                    }
-                    // Create purchase history first
-                    CreatePurchaseHistoryRequest purchaseRequest = CreatePurchaseHistoryRequest.builder()
-                            .userId(null)
-                            .isGuest(true)
-                            .recordId(item.getRecordId())
-                            .quantity(item.getQuantity())
-                            .price(item.getPrice())
-                            .totalAmount(itemTotal)
-                            .discountPercentage(couponDiscount)
-                            .build();
-
-                    totalOrderAmount += item.getPrice() * item.getQuantity();
-
-                    log.info("Creating purchase history for guest order: {}", purchaseRequest);
-                    CreatePurchaseHistoryResponse purchaseResponse = purchaseHistoryUseCase.createPurchaseHistory(purchaseRequest);
-                    log.info("Created purchase history with ID: {}", purchaseResponse.getId());
-
-                    try {
-                        GuestDetailsEntity guestOrder = GuestDetailsEntity.builder()
-                                .purchaseHistoryId(purchaseResponse.getId())
-                                .fname(guestDetails.getFname())
-                                .lname(guestDetails.getLname())
-                                .email(guestDetails.getEmail())
-                                .address(guestDetails.getAddress())
-                                .postalCode(guestDetails.getPostalCode())
-                                .country(guestDetails.getCountry())
-                                .city(guestDetails.getCity())
-                                .region(guestDetails.getRegion())
-                                .phonenum(guestDetails.getPhonenum())
-                                .build();
-
-                        log.info("Attempting to save guest order: {}", guestOrder);
-                        GuestDetailsEntity savedGuest = guestOrderRepository.save(guestOrder);
-                        log.info("Successfully saved guest order with ID: {}", savedGuest.getId());
-                    } catch (Exception e) {
-                        log.error("Failed to save guest order for purchase history ID: {}", purchaseResponse.getId(), e);
-                        throw e;
-                    }
-                }
-                try {
-                    log.info("Sending order confirmation email to: {}", guestDetails.getEmail());
-                    emailUseCase.sendOrderConfirmation(
-                            guestDetails.getEmail(),
-                            items,
-                            totalOrderAmount,
-                            orderNumber
-                    );
-                    log.info("Successfully sent order confirmation email");
-                } catch (Exception e) {
-                    log.error("Failed to send order confirmation email", e);
-                }
-            } catch (Exception e) {
-                log.error("Error processing guest details: {}", e.getMessage(), e);
-                throw e;
-            }
-        } else {
-            log.info("No guest details found in metadata or not a guest order");
+    private List<CheckoutRequest.Item> applyDiscount(List<CheckoutRequest.Item> items, Integer couponDiscount) {
+        if (couponDiscount != null && couponDiscount > 0) {
+            return items.stream()
+                    .map(item -> {
+                        double originalPrice = item.getPrice();
+                        double discountedPrice = originalPrice * (1 - (couponDiscount / 100.0));
+                        item.setDiscountedPrice(discountedPrice);
+                        return item;
+                    })
+                    .toList();
         }
+        return items;
+    }
 
-        // Process the purchase items
-        Long userId = parseUserId(metadata, isGuest);
+    private double calculateTotalAmount(List<CheckoutRequest.Item> items) {
+        return items.stream()
+                .mapToDouble(item -> (item.getDiscountedPrice() != null
+                        ? item.getDiscountedPrice()
+                        : item.getPrice()) * item.getQuantity())
+                .sum();
+    }
+
+    private void processAllItems(List<CheckoutRequest.Item> items, Long userId,
+                                 boolean isGuest, Map<String, String> metadata) {
         for (CheckoutRequest.Item item : items) {
-            try {
-                processPurchaseItem(item, userId, isGuest, metadata);
-            } catch (Exception e) {
-                log.error("Failed to process item during checkout: {}", item, e);
-                throw new PurchaseProcessingException("Purchase processing failed", e);
-            }
+            processPurchaseItem(item, userId, isGuest, metadata);
         }
-        // coupon generation
+    }
+
+    private String getRecipientEmail(boolean isGuest, Long userId, Map<String, String> metadata)
+            throws JsonProcessingException {
+        if (isGuest) {
+            GuestDetails guestDetails = objectMapper.readValue(
+                    metadata.get(GUEST_DETAILS), GuestDetails.class);
+            return guestDetails.getEmail();
+        } else {
+            GetUserResponse user = userUseCase.getUser(new GetUserRequest(userId));
+            return user.getEmail();
+        }
+    }
+
+    private void handleFrequentShopperCoupon(Long userId) {
         if (userId != null) {
             try {
                 GenerateCouponRequest couponRequest = GenerateCouponRequest.builder()
@@ -299,63 +486,21 @@ public class StripeUseCaseImpl implements StripeUseCase {
                         .discountPercentage(30)
                         .build();
 
-                boolean couponGenerated = couponUseCase.generateFrequentShopperCoupon(couponRequest);
-                if (couponGenerated) {
+                if (couponUseCase.generateFrequentShopperCoupon(couponRequest)) {
                     log.info("Generated new coupon for user {}", userId);
                 }
             } catch (Exception e) {
                 log.error("Failed to generate coupon for user {}", userId, e);
             }
         }
-        // send email to registered user logic
-        String recipientEmail;
-        String orderNumber = generateOrderNumber();
-        double totalOrderAmount = items.stream()
-                .mapToDouble(item -> item.getPrice() * item.getQuantity())
-                .sum();
-
-        if (isGuest) {
-            GuestDetails guestDetails = objectMapper.readValue(metadata.get(GUEST_DETAILS), GuestDetails.class);
-            recipientEmail = guestDetails.getEmail();
-        } else {
-            GetUserResponse user = userUseCase.getUser(new GetUserRequest(userId));
-            recipientEmail = user.getEmail();
-        }
-
-        try {
-            log.info("Sending order confirmation email to: {}", recipientEmail);
-            if (couponDiscount != null && couponDiscount > 0) {
-                items = items.stream()
-                        .map(item -> {
-                            double originalPrice = item.getPrice();
-                            double discountedPrice = originalPrice * (1 - (couponDiscount / 100.0));
-                            item.setDiscountedPrice(discountedPrice);
-                            return item;
-                        })
-                        .collect(Collectors.toList());
-
-                totalOrderAmount = items.stream()
-                        .mapToDouble(item -> (item.getDiscountedPrice() != null ?
-                                item.getDiscountedPrice() : item.getPrice()) * item.getQuantity())
-                        .sum();
-            }
-            emailUseCase.sendOrderConfirmation(
-                    recipientEmail,
-                    items,
-                    totalOrderAmount,
-                    orderNumber
-            );
-            log.info("Successfully sent order confirmation email");
-        } catch (Exception e) {
-            log.error("Failed to send order confirmation email", e);
-        }
     }
+
     private String generateOrderNumber() {
         return "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private Map<String, String> parseMetadata(JsonNode sessionNode) {
-        JsonNode metadataNode = sessionNode.path("metadata");
+        JsonNode metadataNode = sessionNode.path(METADATA);
         Map<String, String> metadata = new HashMap<>();
         metadataNode.fields().forEachRemaining(entry ->
                 metadata.put(entry.getKey(), entry.getValue().asText())
@@ -364,7 +509,7 @@ public class StripeUseCaseImpl implements StripeUseCase {
     }
 
     private List<CheckoutRequest.Item> parseItems(JsonNode sessionNode) throws JsonProcessingException {
-        String itemsJson = sessionNode.path("metadata").path(ITEMS).asText();
+        String itemsJson = sessionNode.path(METADATA).path(ITEMS).asText();
         return objectMapper.readValue(
                 itemsJson,
                 new TypeReference<List<CheckoutRequest.Item>>() {}
@@ -372,37 +517,79 @@ public class StripeUseCaseImpl implements StripeUseCase {
     }
 
     private boolean parseIsGuest(Map<String, String> metadata) {
-        return Optional.ofNullable(metadata.get(IS_GUEST))
-                .map(Boolean::parseBoolean)
-                .orElse(true);
+        String isGuestValue = metadata.get(IS_GUEST);
+        if (isGuestValue == null) {
+            return true; // Default to guest if no value
+        }
+
+        // Check for various "false" conditions
+        return !("false".equalsIgnoreCase(isGuestValue) ||
+                "0".equals(isGuestValue) ||
+                "no".equalsIgnoreCase(isGuestValue));
     }
 
     private Long parseUserId(Map<String, String> metadata, boolean isGuest) {
-        if (isGuest) return null;
+        if (!isGuest) {
+            String userIdStr = metadata.get(USER_ID);
+            if (userIdStr != null && !userIdStr.isEmpty()) {
+                try {
+                    Long userId = Long.parseLong(userIdStr);
+                    log.debug("Parsed user ID to long: {}", userId);
 
-        String userIdStr = metadata.get(USER_ID);
-        try {
-            return userIdStr != null && !userIdStr.isEmpty()
-                    ? Long.parseLong(userIdStr)
-                    : null;
-        } catch (NumberFormatException e) {
-            log.warn("Invalid userId in metadata: {}", userIdStr);
-            return null;
-        }
-    }
-
-    private void processPurchaseItem(CheckoutRequest.Item item, Long userId, boolean isGuest, Map<String, String> metadata) {
-        try {
-            double originalPrice = item.getPrice();
-            double finalPrice = originalPrice;
-
-            // Apply discount for registered users
-            if (metadata.containsKey("couponDiscount")) {
-                Integer couponDiscount = Integer.parseInt(metadata.get("couponDiscount"));
-                if (couponDiscount > 0) {
-                    finalPrice = originalPrice * (1 - (couponDiscount / 100.0));
+                    // Verify user exists
+                    GetUserResponse user = userUseCase.getUser(new GetUserRequest(userId));
+                    if (user != null && user.getEmail() != null) {
+                        log.info("Verified user ID: {}", userId);
+                        return userId;
+                    }else {
+                        log.warn("User found but missing email for ID: {}", userId);
+                        throw new PurchaseProcessingException("Invalid user: Missing email");
+                    }
+                } catch (NumberFormatException e) {
+                    log.error("Failed to parse user ID: {}", userIdStr);
+                    throw new PurchaseProcessingException("Invalid user ID format");
+                } catch (Exception e) {
+                    log.error("Error verifying user ID: {}", userIdStr, e);
+                    throw new PurchaseProcessingException("Failed to verify user");
                 }
             }
+            // If it gets here with !isGuest but no valid userId, it's an error
+            throw new PurchaseProcessingException("User ID required for registered user checkout");
+
+        }
+        log.info("No valid user ID found, processing as guest");
+        return null;
+    }
+
+    // New method for retryable emailtest sending
+    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000))
+    private void sendOrderConfirmationWithRetry(String email, List<CheckoutRequest.Item> items,
+                                                double totalAmount, String orderNumber) {
+        try {
+            emailUseCase.sendOrderConfirmation(email, items, totalAmount, orderNumber);
+            log.info("Successfully sent order confirmation emailtest to: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send order confirmation emailtest to: {}", email, e);
+            throw e; // Retry will be triggered
+        }
+    }
+    private void processPurchaseItem(CheckoutRequest.Item item, Long userId, boolean isGuest, Map<String, String> metadata) {
+        try {
+            GetRecordResponse recordResponse = recordUseCase.getRecord(new GetRecordRequest(item.getRecordId()));
+            if (recordResponse.getQuantity() < item.getQuantity()) {
+                throw new InsufficientQuantityException(
+                        "Insufficient quantity for record: " + item.getTitle()
+                );
+            }
+            double finalPrice = item.getPrice();
+            if (metadata.containsKey(COUPON_DISCOUNT)) {
+                Integer couponDiscount = Integer.parseInt(metadata.get(COUPON_DISCOUNT));
+                if (couponDiscount > 0) {
+                    finalPrice = finalPrice * (1 - (couponDiscount / 100.0));
+                }
+            }
+
+
             // Create purchase history first
             CreatePurchaseHistoryRequest purchaseRequest = CreatePurchaseHistoryRequest.builder()
                     .userId(userId)
@@ -411,22 +598,12 @@ public class StripeUseCaseImpl implements StripeUseCase {
                     .quantity(item.getQuantity())
                     .price(finalPrice)
                     .totalAmount(finalPrice * item.getQuantity())
-                    .discountPercentage(metadata.containsKey("couponDiscount") ?
-                            Integer.parseInt(metadata.get("couponDiscount")) : null)
+                    .discountPercentage(metadata.containsKey(COUPON_DISCOUNT) ?
+                            Integer.parseInt(metadata.get(COUPON_DISCOUNT)) : null)
                     .build();
 
             purchaseHistoryUseCase.createPurchaseHistory(purchaseRequest);
 
-            // Prepare update request with full record details
-            GetRecordRequest getRecordRequest = new GetRecordRequest(item.getRecordId());
-            GetRecordResponse recordResponse = recordUseCase.getRecord(getRecordRequest);
-
-            // Check quantity before update
-            if (recordResponse.getQuantity() < item.getQuantity()) {
-                throw new InsufficientQuantityException(
-                        "Insufficient quantity for record: " + item.getTitle()
-                );
-            }
 
             // Prepare update request with full details
             UpdateRecordRequest updateRequest = UpdateRecordRequest.builder()
@@ -450,17 +627,20 @@ public class StripeUseCaseImpl implements StripeUseCase {
             log.error("Failed to process purchase item: {}", item, e);
             throw new PurchaseProcessingException("Purchase processing failed", e);
         }
+
     }
 
     @Override
     public boolean verifySession(String sessionId) {
-        try {
-            Stripe.apiKey = stripeSecretKey;
-            Session session = Session.retrieve(sessionId);
-            return "complete".equals(session.getStatus());
-        } catch (StripeException e) {
-            log.error("Session verification error", e);
-            return false;
+        synchronized (StripeUseCaseImpl.class) {
+            try {
+                Stripe.apiKey = stripeSecretKey;
+                Session session = Session.retrieve(sessionId);
+                return "complete".equals(session.getStatus());
+            } catch (StripeException e) {
+                log.error("Session verification error", e);
+                return false;
+            }
         }
     }
 }

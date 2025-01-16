@@ -11,11 +11,12 @@ import org.myexample.spinningmotion.persistence.entity.UserEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class UserUseCaseImpl implements UserUseCase {
+    private static final String USER_NOT_FOUND_MESSAGE = "User not found with id: ";
+
     private final UserRepository userRepository;
 
     @Override
@@ -34,7 +35,7 @@ public class UserUseCaseImpl implements UserUseCase {
     @Override
     public GetUserResponse getUser(GetUserRequest request) {
         UserEntity entity = userRepository.findById(request.getId())
-                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + request.getId()));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE  + request.getId()));
         return convertToGetResponse(entity);
     }
 
@@ -43,13 +44,13 @@ public class UserUseCaseImpl implements UserUseCase {
         List<UserEntity> entities = userRepository.findAll();
         return entities.stream()
                 .map(this::convertToGetResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public UpdateUserResponse updateUser(UpdateUserRequest request) {
         UserEntity entity = userRepository.findById(request.getId())
-                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + request.getId()));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE  + request.getId()));
 
         updateEntityFromRequest(entity, request);
         UserEntity updatedEntity = userRepository.save(entity);
@@ -59,7 +60,7 @@ public class UserUseCaseImpl implements UserUseCase {
     @Override
     public void deleteUser(Long id) {
         if (!userRepository.findById(id).isPresent()) {
-            throw new UserNotFoundException("User not found with id: " + id);
+            throw new UserNotFoundException(USER_NOT_FOUND_MESSAGE  + id);
         }
         userRepository.deleteById(id);
     }

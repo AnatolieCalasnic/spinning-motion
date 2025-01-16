@@ -2,7 +2,6 @@ package org.myexample.spinningmotion.business.interfc;
 
 
 import org.myexample.spinningmotion.domain.record.*;
-import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;
