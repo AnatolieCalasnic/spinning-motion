@@ -13,28 +13,23 @@ test:
         - ./gradlew test
 
 docker:
-    stage: docker
-    variables: 
-        NETWORK_NAME: "spinning_network"
     script:
-      # Stop and remove existing containers if they exist
-        - if (docker ps -a -q -f name=spinning-motion) { docker stop spinning-motion }
-        - if (docker ps -a -q -f name=mysql-container) { docker stop mysql-container }
-
-        # Remove containers if they exist
-        - if (docker ps -a -q -f name=spinning-motion) { docker rm spinning-motion }
-        - if (docker ps -a -q -f name=mysql-container) { docker rm mysql-container }
-
-        # Remove network if exists and create new one
-        - if (docker network ls --format '{{.Name}}' | Select-String -Pattern ${DOCKER_NETWORK}) { docker network rm ${DOCKER_NETWORK} }
-        - docker network create ${Env:DOCKER_NETWORK}
+        # PowerShell-friendly container cleanup
+        - docker stop spinning-motion; if ($LASTEXITCODE -eq 1) { exit 0 }
+        - docker stop mysql-container; if ($LASTEXITCODE -eq 1) { exit 0 }
+        - docker rm spinning-motion; if ($LASTEXITCODE -eq 1) { exit 0 }
+        - docker rm mysql-container; if ($LASTEXITCODE -eq 1) { exit 0 }
+        
+        # Network cleanup with error handling
+        - docker network rm ${DOCKER_NETWORK}; if ($LASTEXITCODE -eq 1) { exit 0 }
+        - docker network create ${DOCKER_NETWORK}
 
         # Start MySQL container
-        - docker run -d --name mysql-container --net=${Env:DOCKER_NETWORK} -e "MYSQL_DATABASE=${Env:MYSQL_DATABASE}" -e "MYSQL_ROOT_PASSWORD=${Env:MYSQL_ROOT_PASSWORD}" mysql:8.0
+        - docker run -d --name mysql-container --net=${DOCKER_NETWORK} -e "MYSQL_DATABASE=${MYSQL_DATABASE}" -e "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}" mysql:8.0
 
-        # Build and run application container
+        # Build and run application
         - docker build -t spinning-motion .
-        - docker run -d --name spinning-motion --net=${Env:DOCKER_NETWORK} -p 8093:8080 -e "SPRING_DATASOURCE_URL=jdbc:mysql://mysql-container:3306/${Env:MYSQL_DATABASE}" -e "SPRING_DATASOURCE_USERNAME=root" -e "SPRING_DATASOURCE_PASSWORD=${Env:MYSQL_ROOT_PASSWORD}" -e "spring_profiles_active=staging" spinning-motion
+        - docker run -d --name spinning-motion --net=${DOCKER_NETWORK} -p 8093:8080 --env spring_profiles_active=staging spinning-motion
     only:
         - main
     dependencies:
