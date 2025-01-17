@@ -1,9 +1,7 @@
 package org.myexample.spinningmotion.persistence;
 
-import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.BeforeEach;
+
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.myexample.spinningmotion.persistence.entity.GenreEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordImageEntity;
@@ -12,8 +10,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -47,9 +43,9 @@ class RecordRepositoryTest {
                 .build();
     }
 
-    private RecordImageEntity createTestImage(RecordEntity record) {
+    private RecordImageEntity createTestImage(RecordEntity vRecord) {
         return RecordImageEntity.builder()
-                .record(record)
+                .record(vRecord)
                 .imageType("jpg")
                 .imageData("test-data".getBytes())
                 .build();
@@ -61,10 +57,10 @@ class RecordRepositoryTest {
         GenreEntity genre = createTestGenre();
         entityManager.persist(genre);
 
-        RecordEntity record = createTestRecord(genre);
+        RecordEntity vRecord = createTestRecord(genre);
 
         // Act
-        RecordEntity savedRecord = recordRepository.save(record);
+        RecordEntity savedRecord = recordRepository.save(vRecord);
 
         // Assert
         assertNotNull(savedRecord.getId());
@@ -77,12 +73,12 @@ class RecordRepositoryTest {
         GenreEntity genre = createTestGenre();
         entityManager.persist(genre);
 
-        RecordEntity record = createTestRecord(genre);
-        entityManager.persist(record);
+        RecordEntity vRecord = createTestRecord(genre);
+        entityManager.persist(vRecord);
         entityManager.flush();
 
         // Act
-        Optional<RecordEntity> foundRecord = recordRepository.findById(record.getId());
+        Optional<RecordEntity> foundRecord = recordRepository.findById(vRecord.getId());
 
         // Assert
         assertTrue(foundRecord.isPresent());
@@ -112,8 +108,8 @@ class RecordRepositoryTest {
         GenreEntity genre = createTestGenre();
         entityManager.persist(genre);
 
-        RecordEntity record = createTestRecord(genre);
-        entityManager.persist(record);
+        RecordEntity vRecord = createTestRecord(genre);
+        entityManager.persist(vRecord);
         entityManager.flush();
 
         // Act
@@ -129,12 +125,12 @@ class RecordRepositoryTest {
         GenreEntity genre = createTestGenre();
         entityManager.persist(genre);
 
-        RecordEntity record = createTestRecord(genre);
-        RecordImageEntity image = createTestImage(record);
-        record.setImages(List.of(image));
+        RecordEntity vRecord = createTestRecord(genre);
+        RecordImageEntity image = createTestImage(vRecord);
+        vRecord.setImages(List.of(image));
 
         // Act
-        RecordEntity savedRecord = recordRepository.save(record);
+        RecordEntity savedRecord = recordRepository.save(vRecord);
 
         // Assert
         assertNotNull(savedRecord.getId());
@@ -146,13 +142,13 @@ class RecordRepositoryTest {
         GenreEntity genre = createTestGenre();
         entityManager.persist(genre);
 
-        RecordEntity record = createTestRecord(genre);
-        entityManager.persist(record);
+        RecordEntity vRecord = createTestRecord(genre);
+        entityManager.persist(vRecord);
         entityManager.flush();
 
         // Act
-        record.setQuantity(20);
-        RecordEntity updatedRecord = recordRepository.save(record);
+        vRecord.setQuantity(20);
+        RecordEntity updatedRecord = recordRepository.save(vRecord);
 
         // Assert
         assertEquals(20, updatedRecord.getQuantity());
@@ -164,14 +160,14 @@ class RecordRepositoryTest {
         GenreEntity genre = createTestGenre();
         entityManager.persist(genre);
 
-        RecordEntity record = createTestRecord(genre);
-        record.setImages(List.of(
-                createTestImage(record),
-                createTestImage(record)
+        RecordEntity vRecord = createTestRecord(genre);
+        vRecord.setImages(List.of(
+                createTestImage(vRecord),
+                createTestImage(vRecord)
         ));
 
         // Act
-        RecordEntity savedRecord = recordRepository.save(record);
+        RecordEntity savedRecord = recordRepository.save(vRecord);
 
         // Assert
         assertEquals(2, savedRecord.getImages().size());
@@ -202,13 +198,13 @@ class RecordRepositoryTest {
         GenreEntity genre = createTestGenre();
         entityManager.persist(genre);
 
-        RecordEntity record = createTestRecord(genre);
-        entityManager.persist(record);
+        RecordEntity vRecord = createTestRecord(genre);
+        entityManager.persist(vRecord);
         entityManager.flush();
 
         // Act
-        record.setPrice(39.99);
-        RecordEntity updatedRecord = recordRepository.save(record);
+        vRecord.setPrice(39.99);
+        RecordEntity updatedRecord = recordRepository.save(vRecord);
 
         // Assert
         assertEquals(39.99, updatedRecord.getPrice());

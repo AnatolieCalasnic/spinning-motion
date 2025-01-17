@@ -5,7 +5,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.myexample.spinningmotion.business.exception.InvalidInputException;
+import org.myexample.spinningmotion.business.interfc.GuestUseCase;
 import org.myexample.spinningmotion.domain.guest_user.GuestDetails;
+import org.myexample.spinningmotion.domain.response.ErrorResponse;
 import org.myexample.spinningmotion.persistence.GuestOrderRepository;
 import org.myexample.spinningmotion.persistence.entity.GuestDetailsEntity;
 import org.springframework.http.HttpStatus;
@@ -23,7 +26,8 @@ class GuestOrderControllerTest {
 
     @Mock
     private GuestOrderRepository guestOrderRepository;
-
+    @Mock
+    private GuestUseCase guestUseCase;
     @InjectMocks
     private GuestOrderController guestOrderController;
 
@@ -42,7 +46,7 @@ class GuestOrderControllerTest {
                 .country("USA")
                 .city("New York")
                 .region("NY")
-                .phonenum("123-456-7890")
+                .phonenum("1234567890")
                 .build();
 
         guestDetailsEntity = GuestDetailsEntity.builder()
@@ -55,7 +59,7 @@ class GuestOrderControllerTest {
                 .country("USA")
                 .city("New York")
                 .region("NY")
-                .phonenum("123-456-7890")
+                .phonenum("1234567890")
                 .build();
     }
 
@@ -63,7 +67,7 @@ class GuestOrderControllerTest {
     void getGuestOrder_ExistingOrder_ReturnsOrder() {
         // Arrange
         Long purchaseHistoryId = 1L;
-        when(guestOrderRepository.findFirstByPurchaseHistoryId(purchaseHistoryId))
+        when(guestUseCase.getGuestOrderByPurchaseId(purchaseHistoryId))
                 .thenReturn(guestDetailsEntity);
 
         // Act
@@ -72,15 +76,15 @@ class GuestOrderControllerTest {
         // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(guestDetailsEntity, response.getBody());
-        verify(guestOrderRepository).findFirstByPurchaseHistoryId(purchaseHistoryId);
+        verify(guestUseCase).getGuestOrderByPurchaseId(purchaseHistoryId);
     }
 
     @Test
     void getGuestOrder_NonExistingOrder_ReturnsNotFound() {
         // Arrange
         Long purchaseHistoryId = 1L;
-        when(guestOrderRepository.findFirstByPurchaseHistoryId(purchaseHistoryId))
-                .thenReturn(null);
+        when(guestUseCase.getGuestOrderByPurchaseId(purchaseHistoryId))
+                .thenThrow(new InvalidInputException("Order not found"));
 
         // Act
         ResponseEntity<GuestDetailsEntity> response = guestOrderController.getGuestOrder(purchaseHistoryId);
@@ -88,37 +92,38 @@ class GuestOrderControllerTest {
         // Assert
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());
-        verify(guestOrderRepository).findFirstByPurchaseHistoryId(purchaseHistoryId);
+        verify(guestUseCase).getGuestOrderByPurchaseId(purchaseHistoryId);
     }
 
     @Test
     void createGuestOrder_ValidDetails_ReturnsCreatedOrder() {
         // Arrange
-        when(guestOrderRepository.save(any(GuestDetailsEntity.class)))
+        when(guestUseCase.createGuestOrder(any(GuestDetails.class)))
                 .thenReturn(guestDetailsEntity);
 
         // Act
-        ResponseEntity<GuestDetailsEntity> response = guestOrderController.createGuestOrder(guestDetails);
+        ResponseEntity<?> response = guestOrderController.createGuestOrder(guestDetails);
 
         // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody() instanceof GuestDetailsEntity);
         assertEquals(guestDetailsEntity, response.getBody());
-        verify(guestOrderRepository).save(any(GuestDetailsEntity.class));
+        verify(guestUseCase).createGuestOrder(any(GuestDetails.class));
     }
 
     @Test
     void createGuestOrder_SaveError_ReturnsInternalServerError() {
         // Arrange
-        when(guestOrderRepository.save(any(GuestDetailsEntity.class)))
-                .thenThrow(new RuntimeException("Database error"));
+        when(guestUseCase.createGuestOrder(any(GuestDetails.class)))
+                .thenThrow(new InvalidInputException("Invalid input"));
 
         // Act
-        ResponseEntity<GuestDetailsEntity> response = guestOrderController.createGuestOrder(guestDetails);
+        ResponseEntity<?> response = guestOrderController.createGuestOrder(guestDetails);
 
         // Assert
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertNull(response.getBody());
-        verify(guestOrderRepository).save(any(GuestDetailsEntity.class));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody() instanceof ErrorResponse);
+        verify(guestUseCase).createGuestOrder(any(GuestDetails.class));
     }
 
     @Test
@@ -126,7 +131,7 @@ class GuestOrderControllerTest {
         // Arrange
         Long orderId = 1L;
         List<GuestDetailsEntity> expectedOrders = Arrays.asList(guestDetailsEntity);
-        when(guestOrderRepository.findAllByPurchaseHistoryId(orderId))
+        when(guestUseCase.getGuestOrdersByOrderId(orderId))
                 .thenReturn(expectedOrders);
 
         // Act
@@ -135,15 +140,15 @@ class GuestOrderControllerTest {
         // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedOrders, response.getBody());
-        verify(guestOrderRepository).findAllByPurchaseHistoryId(orderId);
+        verify(guestUseCase).getGuestOrdersByOrderId(orderId);
     }
 
     @Test
     void getGuestOrdersByOrder_NoOrders_ReturnsNotFound() {
         // Arrange
         Long orderId = 1L;
-        when(guestOrderRepository.findAllByPurchaseHistoryId(orderId))
-                .thenReturn(List.of());
+        when(guestUseCase.getGuestOrdersByOrderId(orderId))
+                .thenThrow(new InvalidInputException("No orders found"));
 
         // Act
         ResponseEntity<List<GuestDetailsEntity>> response = guestOrderController.getGuestOrdersByOrder(orderId);
@@ -151,6 +156,6 @@ class GuestOrderControllerTest {
         // Assert
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());
-        verify(guestOrderRepository).findAllByPurchaseHistoryId(orderId);
+        verify(guestUseCase).getGuestOrdersByOrderId(orderId);
     }
 }

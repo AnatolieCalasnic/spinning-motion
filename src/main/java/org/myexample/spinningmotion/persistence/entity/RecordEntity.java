@@ -1,10 +1,7 @@
 package org.myexample.spinningmotion.persistence.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,11 +22,11 @@ public class RecordEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
+    @NotBlank(message = "Record's title is required")
     @Column(name = "title")
     private String title;
 
-    @NotBlank
+    @NotBlank(message = "Artist name is required")
     @Column(name = "artist")
     private String artist;
 
@@ -42,7 +39,7 @@ public class RecordEntity {
     @Column(name = "price")
     private Double price;
 
-    @Min(1900)
+    @Min(value = 1900, message = "Release year must be 1900 or later")
     @Column(name = "release_year")
     private Integer year;
 
@@ -51,7 +48,7 @@ public class RecordEntity {
     private String condition;
 
     @NotNull
-    @Min(0)
+    @Min(value = 0, message = "Quantity cannot be negative")
     @Column(name = "quantity")
     private Integer quantity;
 

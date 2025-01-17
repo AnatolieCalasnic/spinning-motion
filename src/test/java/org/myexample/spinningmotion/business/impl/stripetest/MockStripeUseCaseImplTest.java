@@ -1,4 +1,4 @@
-package org.myexample.spinningmotion.business.impl.stripe;
+package org.myexample.spinningmotion.business.impl.stripetest;
 
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.myexample.spinningmotion.business.impl.stripe.MockStripeUseCaseImpl;
 import org.myexample.spinningmotion.domain.guest_user.GuestDetails;
 import org.myexample.spinningmotion.domain.stripe.CheckoutRequest;
 import org.myexample.spinningmotion.domain.stripe.CheckoutResponse;

@@ -7,17 +7,28 @@ build:
     stage: build 
     script: 
         - ./gradlew assemble 
-test: 
-    stage: test 
+test:
+    stage: test
     script:
-         - ./gradlew test
+        - ./gradlew test
+
 docker:
     stage: docker
     script:
-        - docker stop spinning-motion; if ($LASTEXITCODE -eq 1) { exit 0 }
-        - docker rm spinning-motion; if ($LASTEXITCODE -eq 1) { exit 0 }
+        # Stop and remove existing containers if they exist
+        - docker stop spinning-motion mysql-container || true
+        - docker rm spinning-motion mysql-container || true
+
+        # Remove network if exists and create new one
+        - docker network rm ${DOCKER_NETWORK} || true
+        - docker network create ${DOCKER_NETWORK}
+
+        # Start MySQL container
+        - docker run -d --name mysql-container --net=${DOCKER_NETWORK} -e "MYSQL_DATABASE=${MYSQL_DATABASE}" -e "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}" mysql:8.0
+
+        # Build and run application container
         - docker build -t spinning-motion .
-        - docker run -d --name spinning-motion --net=spinning_network -p 8093:8080 --env spring_profiles_active=staging spinning-motion
+        - docker run -d --name spinning-motion --net=${DOCKER_NETWORK} -p 8093:8080 -e "SPRING_DATASOURCE_URL=jdbc:mysql://mysql-container:3306/${MYSQL_DATABASE}" -e "SPRING_DATASOURCE_USERNAME=root" -e "SPRING_DATASOURCE_PASSWORD=${MYSQL_ROOT_PASSWORD}" -e "spring_profiles_active=staging" spinning-motion
     only:
         - main
     dependencies:

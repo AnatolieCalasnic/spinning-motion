@@ -24,7 +24,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
-public class ReviewUseCaseImplTest {
+class ReviewUseCaseImplTest {
 
     @Mock
     private ReviewRepository reviewRepository;
@@ -41,13 +41,7 @@ public class ReviewUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        UserEntity user = UserEntity.builder()
-                .id(1L)
-                .build();
 
-        RecordEntity record = RecordEntity.builder()
-                .id(1L)
-                .build();
         createReviewRequest = CreateReviewRequest.builder()
                 .userId(1L)
                 .recordId(1L)
@@ -116,9 +110,12 @@ public class ReviewUseCaseImplTest {
 
     @Test
     void getReview_ReviewNotFound() {
+        GetReviewRequest request = new GetReviewRequest(1L);
+
         when(reviewRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(ReviewNotFoundException.class, () -> reviewUseCase.getReview(new GetReviewRequest(1L)));
+        assertThrows(ReviewNotFoundException.class, () -> { reviewUseCase.getReview(request);
+        });
 
         verify(reviewRepository).findById(1L);
     }

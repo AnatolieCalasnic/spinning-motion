@@ -29,6 +29,15 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
     @Override
     @Transactional
     public CreatePurchaseHistoryResponse createPurchaseHistory(CreatePurchaseHistoryRequest request) {
+        if (request.getRecordId() == null || request.getRecordId() <= 0) {
+            throw new IllegalArgumentException("Record ID must be a positive non-null value.");
+        }
+        if (request.getPrice() <= 0) {
+            throw new IllegalArgumentException("Price must be greater than zero.");
+        }
+        if (request.getQuantity() <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than zero.");
+        }
         // Find the record and check quantity
         RecordEntity record = recordRepository.findById(request.getRecordId())
                 .orElseThrow(() -> new RecordNotFoundException("Record not found with id: " + request.getRecordId()));
@@ -93,7 +102,7 @@ public class PurchaseHistoryUseCaseImpl implements PurchaseHistoryUseCase {
         List<PurchaseHistoryEntity> entities = purchaseHistoryRepository.findAllByUserId(userId);
         return entities.stream()
                 .map(this::convertToGetResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override

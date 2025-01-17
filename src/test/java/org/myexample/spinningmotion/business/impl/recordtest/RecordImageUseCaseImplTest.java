@@ -1,4 +1,4 @@
-package org.myexample.spinningmotion.business.impl;
+package org.myexample.spinningmotion.business.impl.recordtest;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -246,44 +246,51 @@ class RecordImageUseCaseImplTest {
         verify(recordImageRepository).findByRecordId(1L);
         verify(recordImageRepository, never()).save(any());
     }
-
+    private List<RecordImageEntity> uploadSingleFile(Long recordId, MultipartFile file) {
+        return recordImageUseCase.uploadMultipleImages(recordId, Collections.singletonList(file));
+    }
     @Test
     void validateImage_EmptyFile() {
         // Arrange
         MultipartFile emptyFile = new MockMultipartFile(
-                "empty", "empty.jpg", "image/jpeg", new byte[0]
+                "empty",
+                "empty.jpg",
+                "image/jpeg",
+                new byte[0]
         );
 
         // Act & Assert
-        assertThrows(RuntimeException.class, () ->
-                recordImageUseCase.uploadMultipleImages(1L, Collections.singletonList(emptyFile))
-        );
+        assertThrows(RuntimeException.class,
+                () -> uploadSingleFile(1L, emptyFile));
     }
 
     @Test
     void validateImage_FileTooLarge() {
         // Arrange
-        byte[] largeContent = new byte[6_000_000]; // Larger than 5MB
+        byte[] largeContent = new byte[6_000_000];
         MultipartFile largeFile = new MockMultipartFile(
-                "large", "large.jpg", "image/jpeg", largeContent
+                "large",
+                "large.jpg",
+                "image/jpeg",
+                largeContent
         );
 
         // Act & Assert
-        assertThrows(RuntimeException.class, () ->
-                recordImageUseCase.uploadMultipleImages(1L, Collections.singletonList(largeFile))
-        );
+        assertThrows(RuntimeException.class,
+                () -> uploadSingleFile(1L, largeFile));
     }
 
     @Test
     void validateImage_InvalidContentType() {
         // Arrange
         MultipartFile invalidFile = new MockMultipartFile(
-                "invalid", "test.txt", "text/plain", "not-an-image".getBytes()
+                "invalid",
+                "test.txt",
+                "text/plain",
+                "not-an-image".getBytes()
         );
 
-        // Act & Assert
-        assertThrows(RuntimeException.class, () ->
-                recordImageUseCase.uploadMultipleImages(1L, Collections.singletonList(invalidFile))
-        );
+        assertThrows(RuntimeException.class,
+                () -> uploadSingleFile(1L, invalidFile));
     }
 }

@@ -63,7 +63,9 @@ dependencies {
 
     // Payment Integration
     implementation("com.stripe:stripe-java:$stripeVersion")
-
+    //
+    implementation("org.springframework.retry:spring-retry")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
     // Environment Configuration
     implementation("me.paulschwarz:spring-dotenv:$springDotenvVersion")
 

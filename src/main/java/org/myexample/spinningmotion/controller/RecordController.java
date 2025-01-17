@@ -3,14 +3,18 @@ package org.myexample.spinningmotion.controller;
 import lombok.RequiredArgsConstructor;
 import org.myexample.spinningmotion.business.interfc.RecordImageUseCase;
 import org.myexample.spinningmotion.business.interfc.RecordUseCase;
+import org.myexample.spinningmotion.business.interfc.SubscriberUseCase;
 import org.myexample.spinningmotion.domain.record.*;
 import org.myexample.spinningmotion.business.exception.*;
+import org.myexample.spinningmotion.persistence.RecordRepository;
+import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordImageEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,11 +27,18 @@ import java.util.stream.Collectors;
 public class RecordController {
     private final RecordUseCase recordUseCase;
     private final RecordImageUseCase recordImageUseCase;
-
+    private final SubscriberUseCase subscriberUseCase;
+    private final RecordRepository recordRepository;
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CreateRecordResponse> createRecord(
             @RequestPart("record") CreateRecordRequest request,
             @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+
+        if (request.getYear() != null && request.getYear() < 1900) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Release year must be 1900 or later");
+        }
+
         // First create the record
         CreateRecordResponse response = recordUseCase.createRecord(request);
 
@@ -40,7 +51,20 @@ public class RecordController {
                 System.err.println("Failed to upload images: " + e.getMessage());
             }
         }
+        try {
+            RecordEntity newRecord = recordRepository.findById(response.getId())
+                    .orElseThrow(() -> new RecordNotFoundException("Record not found with id: " + response.getId()));
 
+            // Notify subscribers about the new record
+            subscriberUseCase.notifySubscribersOfNewRelease(
+                    newRecord.getTitle(),
+                    newRecord.getArtist(),
+                    newRecord.getPrice(),
+                    newRecord.getGenre().getName()
+            );
+        } catch (RecordNotFoundException e) {
+            System.err.println("Record created but notification failed: " + e.getMessage());
+        }
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 

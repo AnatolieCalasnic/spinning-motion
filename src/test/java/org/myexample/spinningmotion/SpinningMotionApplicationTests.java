@@ -10,6 +10,8 @@ class SpinningMotionApplicationTests {
 
     @Test
     void contextLoads() {
+        // Smoke test to ensure the entire Spring application can be initialized
+        // helps catch configuration errors early in the development process
     }
 
 }

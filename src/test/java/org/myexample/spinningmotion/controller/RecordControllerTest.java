@@ -6,6 +6,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.myexample.spinningmotion.business.interfc.RecordImageUseCase;
+import org.myexample.spinningmotion.business.interfc.SubscriberUseCase;
+import org.myexample.spinningmotion.persistence.RecordRepository;
+import org.myexample.spinningmotion.persistence.entity.GenreEntity;
+import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -22,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -34,6 +40,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RecordControllerTest {
     @Mock
     private RecordUseCase recordUseCase;
+    @Mock
+    private RecordImageUseCase recordImageUseCase;
+
+    @Mock
+    private SubscriberUseCase subscriberUseCase;
+
+    @Mock
+    private RecordRepository recordRepository;
 
     @InjectMocks
     private RecordController controller;
@@ -44,6 +58,7 @@ class RecordControllerTest {
     private UpdateRecordRequest updateRecordRequest;
     private UpdateRecordResponse updateRecordResponse;
     private List<MultipartFile> emptyFileList;
+    private RecordEntity testRecordEntity;
 
     @BeforeEach
     void setUp() {
@@ -100,6 +115,14 @@ class RecordControllerTest {
                 .condition("Used")
                 .quantity(5)
                 .build();
+        testRecordEntity = RecordEntity.builder()
+                .id(1L)
+                .title("Test Album")
+                .artist("Test Artist")
+                .price(11.99)
+                .genre(GenreEntity.builder().id(1L).name("Rock").build())
+                .build();
+
         emptyFileList = Collections.emptyList();
 
     }
@@ -107,9 +130,41 @@ class RecordControllerTest {
     @Test
     void createRecord_Success() {
         when(recordUseCase.createRecord(any())).thenReturn(createRecordResponse);
+        when(recordRepository.findById(1L)).thenReturn(Optional.of(testRecordEntity));
+
+        // Execute
         ResponseEntity<CreateRecordResponse> response = controller.createRecord(createRecordRequest, emptyFileList);
+
+        // Verify
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(createRecordResponse, response.getBody());
+
+        // Verify all interactions in the correct order
+        verify(recordUseCase).createRecord(any());
+        verify(recordRepository).findById(1L);
+        verify(subscriberUseCase).notifySubscribersOfNewRelease(
+                testRecordEntity.getTitle(),
+                testRecordEntity.getArtist(),
+                testRecordEntity.getPrice(),
+                testRecordEntity.getGenre().getName()
+        );
+        verifyNoInteractions(recordImageUseCase);
+    }
+    @Test
+    void createRecord_WithImages() {
+        // Setup mocks
+        when(recordUseCase.createRecord(any())).thenReturn(createRecordResponse);
+        when(recordRepository.findById(1L)).thenReturn(Optional.of(testRecordEntity));
+
+        List<MultipartFile> mockImages = List.of(mock(MultipartFile.class));
+
+        // Execute
+        ResponseEntity<CreateRecordResponse> response = controller.createRecord(createRecordRequest, mockImages);
+
+        // Verify
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        // Remove eq() matchers and pass values directly
+        verify(recordImageUseCase).uploadMultipleImages(1L, mockImages);
     }
 
     @Test

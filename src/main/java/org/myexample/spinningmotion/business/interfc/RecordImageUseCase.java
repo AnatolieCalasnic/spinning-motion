@@ -1,6 +1,5 @@
 package org.myexample.spinningmotion.business.interfc;
 
-import org.myexample.spinningmotion.persistence.entity.RecordEntity;
 import org.myexample.spinningmotion.persistence.entity.RecordImageEntity;
 import org.springframework.web.multipart.MultipartFile;
 
