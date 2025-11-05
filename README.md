@@ -4,11 +4,11 @@ Spinning Motion is a full-stack web application designed to bring something new 
 
 ### Available scripts:
 
-`npm start: Launch development server`
+#### Build the project
+`./gradlew build`
 
-`npm run build: Create production build`
-
-`npm test: Run Cypress E2E tests`
+#### Run tests
+`./gradlew test`
 
 Credentials for admin's dashboard that may be used:
 Admin User - email: admin@gmail.com | password: Admin123!
